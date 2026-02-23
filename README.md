@@ -1,5 +1,7 @@
 # Oh Shell! (osh)
 
+![Version](https://img.shields.io/badge/version-0.1-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+
 Learn and use Linux through natural language — powered by local LLMs via Ollama.
 
 Describe what you want in plain English and get 3–6 executable command options, each with detailed explanations that break down every pipe, flag, and chained command so you understand what you're running.
@@ -84,7 +86,7 @@ osh --version               # Show version
 
 ### Example Session
 
-```
+```zsh
 $ osh find all log files modified in the last 7 days and show their sizes
 
 Checking command availability...
@@ -332,4 +334,4 @@ ollama pull llama3
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 Raul Kivi

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+__version__ = "0.1"
+
 import json
 import os
 import sys
@@ -586,7 +588,7 @@ def parse_arguments() -> argparse.Namespace:
                        help='Use alternate config file')
     parser.add_argument('-m', '--model', metavar='MODEL',
                        help='Model name to use (overrides config), or "-" to list and select interactively')
-    parser.add_argument('--version', action='version', version='%(prog)s 0.2')
+    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
 
     return parser.parse_args()
 
