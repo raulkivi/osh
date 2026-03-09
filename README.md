@@ -334,4 +334,4 @@ ollama pull llama3
 
 ## License
 
-[MIT](LICENSE) © 2026 Raul Kivi
+[MIT](LICENSE) © 2026 [Raul Kivi](https://www.linkedin.com/in/raulkivi/)
