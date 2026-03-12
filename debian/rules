@@ -1,0 +1,7 @@
+#!/usr/bin/make -f
+
+export LC_ALL := C.UTF-8
+export PYBUILD_NAME := osh
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild

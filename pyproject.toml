@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "osh"
+version = "0.1"
+description = "AI-powered command assistant — translates natural language into Linux/shell commands"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [
+    { name = "Raul Kivi" },
+]
+keywords = ["cli", "shell", "ai", "ollama", "llm", "commands"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Shells",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "ollama",
+    "termcolor",
+    "pyperclip",
+]
+
+[project.scripts]
+osh = "osh:main"
+ask = "ask:main"
+
+[project.urls]
+Homepage = "https://github.com/raulkivi/osh"
+"Bug Tracker" = "https://github.com/raulkivi/osh/issues"
+
+[tool.setuptools]
+py-modules = ["osh", "ask"]

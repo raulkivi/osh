@@ -1,0 +1,41 @@
+Source: osh
+Maintainer: Raul Kivi <raul.kivi@proton.me>
+Section: utils
+Priority: optional
+Homepage: https://github.com/raulkivi/osh
+Vcs-Git: https://github.com/raulkivi/osh.git
+Vcs-Browser: https://github.com/raulkivi/osh
+Standards-Version: 4.6.1
+Rules-Requires-Root: no
+Build-Depends: debhelper (>= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools
+
+Package: osh
+Architecture: all
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         python3 (>= 3.11),
+         python3-termcolor,
+         python3-pyperclip
+Recommends: ollama
+Description: AI-powered command assistant using local LLMs
+ osh (Oh Shell!) translates natural language descriptions into executable
+ Linux/shell commands using local LLMs via Ollama.
+ .
+ Describe what you want in plain English and get multiple command
+ alternatives with detailed, line-by-line explanations — no cloud
+ required, no man-page diving.
+ .
+ Features:
+  - Multiple command alternatives per query, each fully explained
+  - Built-in QA safety review (PASS / WARN / MISS / FAIL verdicts)
+  - Checks command availability before suggesting tools
+  - Detects available scripting languages (bash, awk, python, perl, …)
+  - Copy commands to clipboard or execute directly
+  - Companion 'ask' tool for general-purpose Q&A
+  - XDG-compliant paths and daily logging
+  - Supports thinking models (deepseek-r1, etc.)
+ .
+ Note: requires Ollama (https://ollama.com) installed separately.
