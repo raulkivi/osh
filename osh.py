@@ -1116,23 +1116,30 @@ def main() -> None:
     _available_languages = detect_available_languages()
     log_info("AVAILABLE_LANGUAGES: %s", ", ".join(_available_languages))
 
-    # Check if we have a query
-    if not args.query:
-        print_usage(config)
-        sys.exit(1)
-    
-    # Use -a/--ask flag for safety override
     ask_flag: bool = args.ask
 
-    # Join query words into a single prompt
-    user_prompt: str = " ".join(args.query)
+    # Enter shell mode if no query provided
+    if not args.query:
+        run_shell_mode(client, config, shell, ask_flag)
+        sys.exit(0)
 
+    # Single-query mode
+    user_prompt: str = " ".join(args.query)
+    process_query(client, config, shell, user_prompt, ask_flag)
+
+
+def process_query(client: OllamaModel, config: dict[str, Any], shell: str,
+                  user_prompt: str, ask_flag: bool) -> bool:
+    """Process a single natural language query and handle user selection.
+
+    Returns True on normal completion, False when no options could be generated.
+    """
     print(colored("Generating command options...", 'cyan'))
     options: list[tuple[str, str]] = collect_unique_options(client, config, shell, user_prompt)
 
     if not options:
         print(colored("Could not generate command options. Please try again.", 'red'))
-        sys.exit(1)
+        return False
 
     # Check if commands exist in the system
     print(colored("Checking command availability...", 'cyan'))
@@ -1167,7 +1174,7 @@ def main() -> None:
             options = collect_unique_options(client, config, shell, user_prompt)
             if not options:
                 print(colored("Could not generate command options. Please try again.", 'red'))
-                sys.exit(1)
+                return False
             print(colored("Checking command availability...", 'cyan'))
             availability = check_all_commands_availability(options, shell)
             verdicts = []
@@ -1249,7 +1256,7 @@ def main() -> None:
                         options = collect_unique_options(client, config, shell, user_prompt)
                         if not options:
                             print(colored("Could not generate command options. Please try again.", 'red'))
-                            sys.exit(1)
+                            return False
                         print(colored("Checking command availability...", 'cyan'))
                         availability = check_all_commands_availability(options, shell)
                         verdicts = []
@@ -1303,6 +1310,46 @@ def main() -> None:
     else:
         log_info("USER_SELECTED: Invalid (%s) | ACTION: NO_ACTION", user_selection)
         print("No action taken.")
+    return True
+
+
+def run_shell_mode(client: OllamaModel, config: dict[str, Any], shell: str, ask_flag: bool) -> None:
+    """Run osh in interactive shell (REPL) mode.
+
+    Enters a read-eval-print loop that accepts natural language queries.
+    Type '!' (or '!exit' / '!quit') to leave the shell.
+    """
+    print(colored("Oh Shell! - Interactive Shell Mode", 'cyan'))
+    print(colored("Type your request in plain English, or '!' to exit.", 'cyan'))
+    print()
+
+    while True:
+        try:
+            print("osh> ", end='', flush=True)
+            user_input: str = input().strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            log_info("SHELL_MODE: exit via EOF/interrupt")
+            print("Exiting shell mode.")
+            break
+
+        if not user_input:
+            continue
+
+        # Exit commands
+        if user_input == '!' or user_input.lower() in ('!exit', '!quit'):
+            log_info("SHELL_MODE: exit via '%s'", user_input)
+            print("Exiting shell mode.")
+            break
+
+        # Reject unknown !-prefixed commands
+        if user_input.startswith('!'):
+            print(colored(f"Unknown command: {user_input}. Use '!' to exit.", 'yellow'))
+            continue
+
+        log_info("SHELL_MODE_QUERY: %s", _sanitize_for_log(user_input))
+        process_query(client, config, shell, user_input, ask_flag)
+        print()
 
 
 if __name__ == "__main__":
