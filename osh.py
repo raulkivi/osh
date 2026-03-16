@@ -1313,14 +1313,61 @@ def process_query(client: OllamaModel, config: dict[str, Any], shell: str,
     return True
 
 
+_SHELL_MODE_EXIT_PHRASES: frozenset[str] = frozenset({
+    'exit', 'quit', 'bye', 'goodbye', 'q', 'logout', 'leave', 'done', 'stop',
+    'exit shell', 'quit shell', 'exit shell mode', 'quit shell mode',
+})
+
+_SHELL_MODE_COMMANDS: dict[str, str] = {
+    '!exit':    'Exit shell mode',
+    '!quit':    'Exit shell mode',
+    '!help':    'Show this help message',
+    '!version': 'Show osh version',
+    '!history': 'Show recent queries from today\'s session log',
+}
+
+
+def _shell_mode_help() -> None:
+    print(colored("Available commands:", 'cyan'))
+    for cmd, desc in _SHELL_MODE_COMMANDS.items():
+        print(f"  {colored(cmd, 'yellow'):<20} {desc}")
+    print(f"  {'!':<20} Exit shell mode (shorthand)")
+    print(colored("\nOr type any request in plain English.", 'cyan'))
+
+
+def _shell_mode_history(n: int = 20) -> None:
+    log_file: str = get_daily_log_file()
+    if not os.path.exists(log_file):
+        print(colored("No history for today.", 'yellow'))
+        return
+    queries: list[str] = []
+    try:
+        with open(log_file) as f:
+            for line in f:
+                if 'SHELL_MODE_QUERY:' in line:
+                    parts = line.split('SHELL_MODE_QUERY:', 1)
+                    if len(parts) == 2:
+                        queries.append(parts[1].strip())
+    except OSError:
+        print(colored("Could not read history.", 'yellow'))
+        return
+    if not queries:
+        print(colored("No queries in today's history.", 'yellow'))
+        return
+    print(colored(f"Recent queries (today):", 'cyan'))
+    for i, q in enumerate(queries[-n:], 1):
+        print(f"  {i:>3}. {q}")
+
+
 def run_shell_mode(client: OllamaModel, config: dict[str, Any], shell: str, ask_flag: bool) -> None:
     """Run osh in interactive shell (REPL) mode.
 
     Enters a read-eval-print loop that accepts natural language queries.
-    Type '!' (or '!exit' / '!quit') to leave the shell.
+    Type '!help' for available commands or '!' / '!exit' / '!quit' to leave.
+    Natural language exit phrases (e.g. 'exit', 'quit', 'bye') also work.
     """
     print(colored("Oh Shell! - Interactive Shell Mode", 'cyan'))
-    print(colored("Type your request in plain English, or '!' to exit.", 'cyan'))
+    print(colored("Type your request in plain English, or '!help' for commands, '!' to exit.", 'cyan'))
     print()
 
     while True:
@@ -1336,16 +1383,30 @@ def run_shell_mode(client: OllamaModel, config: dict[str, Any], shell: str, ask_
         if not user_input:
             continue
 
-        # Exit commands
+        # Exit via ! commands
         if user_input == '!' or user_input.lower() in ('!exit', '!quit'):
             log_info("SHELL_MODE: exit via '%s'", user_input)
             print("Exiting shell mode.")
             break
 
-        # Reject unknown !-prefixed commands
+        # Other ! commands
         if user_input.startswith('!'):
-            print(colored(f"Unknown command: {user_input}. Use '!' to exit.", 'yellow'))
+            cmd = user_input.lower()
+            if cmd == '!help':
+                _shell_mode_help()
+            elif cmd == '!version':
+                print(f"osh version {__version__}")
+            elif cmd == '!history':
+                _shell_mode_history()
+            else:
+                print(colored(f"Unknown command: {user_input}. Type '!help' for available commands.", 'yellow'))
             continue
+
+        # Natural language exit
+        if user_input.lower() in _SHELL_MODE_EXIT_PHRASES:
+            log_info("SHELL_MODE: exit via natural language '%s'", user_input)
+            print("Exiting shell mode.")
+            break
 
         log_info("SHELL_MODE_QUERY: %s", _sanitize_for_log(user_input))
         process_query(client, config, shell, user_input, ask_flag)
