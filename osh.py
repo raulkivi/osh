@@ -1327,6 +1327,57 @@ _SHELL_MODE_COMMANDS: dict[str, str] = {
 }
 
 
+_ASK_SYSTEM_PROMPT = (
+    "You are a helpful, highly skilled expert. Provide clear, accurate, and concise answers. "
+    "When appropriate, include examples or explanations. Use plain text output without markdown formatting."
+)
+
+
+def _ask_query(client: 'OllamaModel', config: dict[str, Any], query: str) -> None:
+    """Send a direct plain-text question to the LLM and print the response."""
+    try:
+        response = client.chat(
+            model=config['model'],
+            messages=[
+                {"role": "system", "content": _ASK_SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+            ],
+            temperature=config.get('temperature'),
+            max_tokens=config.get('max_tokens'),
+        )
+    except Exception as e:
+        print(colored(f"Error: {e}", 'red'), file=sys.stderr)
+        return
+    import re as _re
+    _ansi = _re.compile(r'(?:\x1B[@-Z\\-_]|\x1B\[[0-?]*[ -/]*[@-~])')
+    print(_ansi.sub('', response))
+
+
+def _shell_prompt() -> str:
+    """Build a two-line zsh-style prompt showing user, cwd, and git branch."""
+    user = os.environ.get('USER') or os.environ.get('LOGNAME') or 'user'
+    home = os.path.expanduser('~')
+    cwd = os.getcwd()
+    if cwd.startswith(home):
+        cwd = '~' + cwd[len(home):]
+
+    branch = ''
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+            capture_output=True, text=True, timeout=2,
+        )
+        if result.returncode == 0:
+            branch = result.stdout.strip()
+    except Exception:
+        pass
+
+    branch_part = colored(f'[{branch}]', 'yellow') if branch else ''
+    top = colored('┌', 'green') + colored(f'({user})', 'green') + colored('-', 'green') + colored(f'[{cwd}]', 'blue') + branch_part
+    bottom = colored('└─: ', 'green')
+    return f'{top}\n{bottom}'
+
+
 def _shell_mode_help() -> None:
     print(colored("Available commands:", 'cyan'))
     for cmd, desc in _SHELL_MODE_COMMANDS.items():
@@ -1372,8 +1423,7 @@ def run_shell_mode(client: OllamaModel, config: dict[str, Any], shell: str, ask_
 
     while True:
         try:
-            print("osh> ", end='', flush=True)
-            user_input: str = input().strip()
+            user_input: str = input(_shell_prompt()).strip()
         except (EOFError, KeyboardInterrupt):
             print()
             log_info("SHELL_MODE: exit via EOF/interrupt")
@@ -1400,6 +1450,15 @@ def run_shell_mode(client: OllamaModel, config: dict[str, Any], shell: str, ask_
                 _shell_mode_history()
             else:
                 print(colored(f"Unknown command: {user_input}. Type '!help' for available commands.", 'yellow'))
+            continue
+
+        # Direct LLM query (ask mode)
+        if user_input.startswith('?'):
+            query = user_input[1:].strip()
+            if query:
+                log_info("SHELL_MODE_ASK: %s", _sanitize_for_log(query))
+                _ask_query(client, config, query)
+                print()
             continue
 
         # Natural language exit
