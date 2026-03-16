@@ -8,6 +8,7 @@ Describe what you want in plain English and get 3–6 executable command options
 
 ## Features
 
+- **Interactive shell mode** — Run `osh` with no arguments to enter a REPL; type queries continuously, use `!help` for commands, or `exit` / `!exit` to leave
 - **Natural language to shell** — Describe what you want; get valid commands back
 - **3–6 alternatives per query** — Shell commands plus one-liners in awk, perl, python3, etc.
 - **Detailed explanations** — Each chained command (pipes, `&&`, `;`) explained on its own line
@@ -75,6 +76,7 @@ osh --init
 ## Usage
 
 ```bash
+osh                         # Enter interactive shell mode (REPL)
 osh <natural language query>
 osh -a <query>              # Always prompt before executing
 osh -m <model> <query>      # Use a specific model (overrides config)
@@ -83,6 +85,41 @@ osh --config PATH <query>   # Use alternate config file
 osh --init                  # Interactive configuration
 osh --version               # Show version
 ```
+
+### Shell Mode (REPL)
+
+Running `osh` without arguments enters an interactive session where you can submit queries one after another without re-invoking the command.
+
+```
+$ osh
+Oh Shell! - Interactive Shell Mode
+Type your request in plain English, or '!help' for commands, '!' to exit.
+
+osh> show disk usage of home directory
+...
+osh> !help
+Available commands:
+  !exit                Exit shell mode
+  !quit                Exit shell mode
+  !help                Show this help message
+  !version             Show osh version
+  !history             Show recent queries from today's session log
+  !                    Exit shell mode (shorthand)
+
+Or type any request in plain English.
+osh> exit
+Exiting shell mode.
+```
+
+| Input | Action |
+|-------|--------|
+| Any natural language | Translated to shell commands as normal |
+| `exit`, `quit`, `bye`, `done`, … | Exit shell mode |
+| `!exit` / `!quit` / `!` | Exit shell mode |
+| `!help` | List available `!` commands |
+| `!version` | Show osh version |
+| `!history` | Show recent queries from today's session log |
+| Ctrl-C / Ctrl-D | Exit shell mode |
 
 ### Example Session
 
