@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:documentation.ubuntu.com)",
+      "WebFetch(domain:help.launchpad.net)",
+      "WebFetch(domain:www.debian.org)",
+      "WebFetch(domain:wiki.debian.org)",
+      "WebFetch(domain:packaging.python.org)",
+      "WebFetch(domain:manpages.debian.org)",
+      "WebFetch(domain:wiki.ubuntu.com)",
+      "WebFetch(domain:dyn.manpages.debian.org)",
+      "WebFetch(domain:ubuntu-manpage.readthedocs.io)",
+      "WebFetch(domain:help.ubuntu.com)",
+      "Bash(chmod +x /home/luarvik/src/osh/debian/rules)"
+    ],
+    "additionalDirectories": [
+      "/home/luarvik/src/osh/debian"
+    ]
+  }
+}
