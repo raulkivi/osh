@@ -174,6 +174,8 @@ Each command is tagged by the safety review:
 Pipe text to `ask` for general-purpose Q&A:
 
 ```bash
+ask "What is the capital of France?"
+ask what is the capital of France?
 echo "What is the capital of France?" | ask
 cat error.log | ask "What went wrong?"
 ```

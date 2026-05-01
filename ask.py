@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+__version__ = "0.2"
+
 import json
 import os
 import re
@@ -137,16 +139,38 @@ from ollama import ChatResponse, Client
 
 
 def main() -> None:
-    if sys.stdin.isatty():
-        print("Usage: echo 'your question' | ask", file=sys.stderr)
-        print("       some_command | ask", file=sys.stderr)
+    args: list[str] = sys.argv[1:]
+
+    if args and args[0] in ('--version', '-V'):
+        print(f"ask {__version__}")
+        sys.exit(0)
+
+    arg_question: str = " ".join(args).strip()
+    has_args: bool = bool(arg_question)
+    has_stdin: bool = not sys.stdin.isatty()
+
+    if not has_args and not has_stdin:
+        print("Usage: ask <question>", file=sys.stderr)
+        print("       ask \"this is a question?\"", file=sys.stderr)
+        print("       echo 'your question' | ask", file=sys.stderr)
+        print("       cat file | ask \"what does this mean?\"", file=sys.stderr)
         sys.exit(1)
 
     MAX_STDIN_BYTES: int = 1 * 1024 * 1024  # 1 MB
-    raw: str = sys.stdin.read(MAX_STDIN_BYTES)
-    if len(raw) == MAX_STDIN_BYTES:
-        print("Warning: input truncated at 1 MB.", file=sys.stderr)
-    user_input: str = raw.strip()
+    stdin_content: str = ""
+    if has_stdin:
+        raw: str = sys.stdin.read(MAX_STDIN_BYTES)
+        if len(raw) == MAX_STDIN_BYTES:
+            print("Warning: input truncated at 1 MB.", file=sys.stderr)
+        stdin_content = raw.strip()
+
+    if has_args and has_stdin:
+        user_input = f"{arg_question}\n\n{stdin_content}" if stdin_content else arg_question
+    elif has_args:
+        user_input = arg_question
+    else:
+        user_input = stdin_content
+
     if not user_input:
         print("No input received.", file=sys.stderr)
         sys.exit(1)
