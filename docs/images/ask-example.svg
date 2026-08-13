@@ -1,0 +1,19 @@
+<svg width="700" height="260" viewBox="0 0 700 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="zsh — ask">
+<defs><clipPath id="clip-8190172315202956519"><rect width="700" height="260" rx="12" ry="12"/></clipPath></defs>
+<g clip-path="url(#clip-8190172315202956519)">
+<rect width="700" height="260" fill="#1e1e2e"/>
+<rect width="700" height="36" fill="#2b2b3d"/>
+<circle cx="20" cy="18.0" r="6" fill="#ff5f56"/>
+<circle cx="40" cy="18.0" r="6" fill="#ffbd2e"/>
+<circle cx="60" cy="18.0" r="6" fill="#27c93f"/>
+<text x="350.0" y="22.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="12" fill="#8a8aa3">zsh — ask</text>
+<text x="20" y="62" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">$ </tspan><tspan fill="#d6d6e2">ask "What is the capital of France?"</tspan></text>
+<text x="20" y="82" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">The capital of France is Paris.</tspan></text>
+<text x="20" y="122" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">$ </tspan><tspan fill="#d6d6e2">cat error.log | ask "What went wrong?"</tspan></text>
+<text x="20" y="142" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">The log shows a connection timeout while reaching the database at</tspan></text>
+<text x="20" y="162" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">10.0.0.5:5432 — likely a network or firewall configuration issue.</tspan></text>
+<text x="20" y="202" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">$ </tspan><tspan fill="#d6d6e2">echo "What is the capital of France?" | ask</tspan></text>
+<text x="20" y="222" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">The capital of France is Paris.</tspan></text>
+</g>
+<rect x="0.5" y="0.5" width="699" height="259" rx="12" ry="12" fill="none" stroke="#3a3a4d"/>
+</svg>

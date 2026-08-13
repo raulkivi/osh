@@ -1,0 +1,29 @@
+<svg width="900" height="540" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="zsh — osh (shell mode)">
+<defs><clipPath id="clip-6346815830322567542"><rect width="900" height="540" rx="12" ry="12"/></clipPath></defs>
+<g clip-path="url(#clip-6346815830322567542)">
+<rect width="900" height="540" fill="#1e1e2e"/>
+<rect width="900" height="36" fill="#2b2b3d"/>
+<circle cx="20" cy="18.0" r="6" fill="#ff5f56"/>
+<circle cx="40" cy="18.0" r="6" fill="#ffbd2e"/>
+<circle cx="60" cy="18.0" r="6" fill="#27c93f"/>
+<text x="450.0" y="22.0" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="12" fill="#8a8aa3">zsh — osh (shell mode)</text>
+<text x="20" y="62" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">$ </tspan><tspan fill="#d6d6e2">osh</tspan></text>
+<text x="20" y="82" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#56c2d6">Host: </tspan><tspan fill="#56c2d6">http://localhost:11434  Model: gpt-oss:latest</tspan></text>
+<text x="20" y="102" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#d6d6e2">Oh Shell! - Interactive Shell Mode</tspan></text>
+<text x="20" y="122" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">Type your request in plain English, or '!help' for commands, '!' to exit.</tspan></text>
+<text x="20" y="162" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">┌(raul)-[~/src/osh]</tspan><tspan fill="#e0c46c">[main]</tspan></text>
+<text x="20" y="182" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">└─: </tspan><tspan fill="#d6d6e2">show disk usage of home directory</tspan></text>
+<text x="20" y="222" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#d6d6e2">Available commands:</tspan></text>
+<text x="20" y="262" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#56c2d6">  1. </tspan><tspan fill="#6c9fe0">du -sh ~</tspan><tspan fill="#8fd46c"> [PASS]</tspan></text>
+<text x="20" y="282" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">     Show total disk usage of home directory in human-readable form</tspan></text>
+<text x="20" y="322" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#d6d6e2">Select command [1] or [n]o ==&gt; </tspan><tspan fill="#d6d6e2">n</tspan></text>
+<text x="20" y="362" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">┌(raul)-[~/src/osh]</tspan><tspan fill="#e0c46c">[main]</tspan></text>
+<text x="20" y="382" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">└─: </tspan><tspan fill="#d6d6e2">?what does the sticky bit do on a directory</tspan></text>
+<text x="20" y="402" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">A sticky bit on a directory means only the file's owner (or root) can</tspan></text>
+<text x="20" y="422" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#7f7f99">delete or rename files inside it, even if others can write to it.</tspan></text>
+<text x="20" y="462" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">┌(raul)-[~/src/osh]</tspan><tspan fill="#e0c46c">[main]</tspan></text>
+<text x="20" y="482" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#8fd46c">└─: </tspan><tspan fill="#d6d6e2">exit</tspan></text>
+<text x="20" y="502" font-family="ui-monospace, SFMono-Regular, 'Cascadia Code', Menlo, Consolas, monospace" font-size="14" xml:space="preserve"><tspan fill="#d6d6e2">Exiting shell mode.</tspan></text>
+</g>
+<rect x="0.5" y="0.5" width="899" height="539" rx="12" ry="12" fill="none" stroke="#3a3a4d"/>
+</svg>

@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "osh"
-version = "0.1"
+version = "0.2"
 description = "AI-powered command assistant — translates natural language into Linux/shell commands"
 readme = "README.md"
 license = { text = "MIT" }

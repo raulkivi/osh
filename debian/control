@@ -24,12 +24,13 @@ Description: AI-powered command assistant using local LLMs
  osh (Oh Shell!) translates natural language descriptions into executable
  Linux/shell commands using local LLMs via Ollama.
  .
- Describe what you want in plain English and get multiple command
+ Describe what you want in plain English and get 3 ranked command
  alternatives with detailed, line-by-line explanations — no cloud
  required, no man-page diving.
  .
  Features:
-  - Multiple command alternatives per query, each fully explained
+  - 3 command alternatives per query, each fully explained
+  - Interactive shell mode (REPL) with a direct '?' Q&A shortcut
   - Built-in QA safety review (PASS / WARN / MISS / FAIL verdicts)
   - Checks command availability before suggesting tools
   - Detects available scripting languages (bash, awk, python, perl, …)
