@@ -6,7 +6,7 @@ Learn and use Linux through natural language — powered by local LLMs via Ollam
 
 Describe what you want in plain English and get 3 executable command options, each with detailed explanations that break down every pipe, flag, and chained command so you understand what you're running.
 
-![osh translating a natural language query into three ranked shell command options](docs/images/osh-example.svg)
+![osh translating a natural language query into three ranked shell command options, selecting one, and running it](docs/images/osh-demo.gif)
 
 ## Features
 
