@@ -77,8 +77,9 @@ def test_blocks_execution_when_command_not_available(monkeypatch, capsys, config
     monkeypatch.setattr(osh.subprocess, "run", lambda *a, **k: run_calls.append(a))
     monkeypatch.setattr("builtins.input", make_input(["1"]))
 
-    osh.process_query(object(), config, "/bin/bash", "list things", False)
+    result = osh.process_query(object(), config, "/bin/bash", "list things", False)
 
+    assert result is True
     assert run_calls == []
     assert "not found in system" in capsys.readouterr().out
 
@@ -94,8 +95,9 @@ def test_blocks_execution_when_qa_verdict_is_fail(monkeypatch, capsys, config):
     # decline it ('n'), then make the actual selection ('1').
     monkeypatch.setattr("builtins.input", make_input(["n", "1"]))
 
-    osh.process_query(object(), config, "/bin/bash", "delete everything", False)
+    result = osh.process_query(object(), config, "/bin/bash", "delete everything", False)
 
+    assert result is True
     assert run_calls == []
     assert "Command blocked by safety review" in capsys.readouterr().out
 
@@ -109,8 +111,9 @@ def test_warn_verdict_declined_by_user(monkeypatch, config):
     monkeypatch.setattr(osh.subprocess, "run", lambda *a, **k: run_calls.append(a))
     monkeypatch.setattr("builtins.input", make_input(["1", "n"]))
 
-    osh.process_query(object(), config, "/bin/bash", "move file", False)
+    result = osh.process_query(object(), config, "/bin/bash", "move file", False)
 
+    assert result is True
     assert run_calls == []
 
 
@@ -139,8 +142,9 @@ def test_ask_flag_confirmation_declined(monkeypatch, config):
     monkeypatch.setattr(osh.subprocess, "run", lambda *a, **k: run_calls.append(a))
     monkeypatch.setattr("builtins.input", make_input(["1", "n"]))
 
-    osh.process_query(object(), config, "/bin/bash", "create file", ask_flag=True)
+    result = osh.process_query(object(), config, "/bin/bash", "create file", ask_flag=True)
 
+    assert result is True
     assert run_calls == []
 
 
@@ -211,8 +215,9 @@ def test_copy_blocked_without_display(monkeypatch, capsys, config):
     monkeypatch.delenv("DISPLAY", raising=False)
     monkeypatch.setattr("builtins.input", make_input(["c"]))
 
-    osh.process_query(object(), config, "/bin/bash", "list", False)
+    result = osh.process_query(object(), config, "/bin/bash", "list", False)
 
+    assert result is True
     assert "Clipboard not available without DISPLAY." in capsys.readouterr().out
 
 
@@ -315,3 +320,37 @@ def test_command_failure_retry_regenerates_and_executes_new_selection(monkeypatc
 
     assert run_calls == [["/bin/bash", "-c", "false"], ["/bin/bash", "-c", "true"]]
     assert call_count["n"] == 2
+
+
+def test_command_failure_retry_still_blocks_a_fail_verdict_on_the_new_options(monkeypatch, config):
+    """Regression test: the pre-refactor code path taken after a failed
+    execution regenerated options but then executed the user's next pick
+    directly, skipping the availability/FAIL/WARN gates. The refactored loop
+    routes every execution through the same gates, retries included — this
+    pins that fix down.
+    """
+    first_options = [("false", "Always fails")]
+    second_options = [("rm -rf /", "Delete everything")]
+    verdicts_by_call = [[("PASS", "")], [("FAIL", "destroys the filesystem")]]
+    call_count = {"n": 0}
+
+    def fake_collect(*a, **k):
+        call_count["n"] += 1
+        return first_options if call_count["n"] == 1 else second_options
+
+    def fake_qa(*a, **k):
+        return verdicts_by_call[call_count["n"] - 1]
+
+    monkeypatch.setattr(osh, "collect_unique_options", fake_collect)
+    monkeypatch.setattr(osh, "check_all_commands_availability", lambda *a, **k: [True])
+    monkeypatch.setattr(osh, "qa_review", fake_qa)
+
+    run_calls = []
+    monkeypatch.setattr(osh.subprocess, "run", lambda cmd, **k: run_calls.append(cmd) or FakeCompletedProcess(1))
+    # select 'false' (fails) -> retry -> reuse prompt -> select the new (now FAIL-rated) option
+    monkeypatch.setattr("builtins.input", make_input(["1", "r", "", "1"]))
+
+    osh.process_query(object(), config, "/bin/bash", "list", False)
+
+    # Only the first, non-FAIL execution should have actually run a command.
+    assert run_calls == [["/bin/bash", "-c", "false"]]

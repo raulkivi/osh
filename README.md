@@ -1,6 +1,6 @@
 # Oh Shell! (osh)
 
-![Version](https://img.shields.io/badge/version-1.0-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-1.1-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Learn and use Linux through natural language — powered by local LLMs via Ollama.
 
@@ -226,7 +226,7 @@ osh --init
 | `model` | Ollama model name | `gpt-oss:latest` |
 | `temperature` | Randomness (0.0–2.0) | `0.3` |
 | `max_tokens` | Max response tokens (increase for thinking models) | `2400` |
-| `safety` | Prompt before executing commands | `true` |
+| `safety` | Stored/shown by `--init` and the usage screen; not currently wired to any prompt-before-execute logic (that's controlled by `-a`/`--ask` and WARN verdicts) | `true` |
 | `qa_review` | Enable second-pass safety review | `true` |
 | `suggested_command_color` | Terminal color for displayed commands | `blue` |
 | `python_venv` | `null`, `"pyenv:name"`, or `"venv:/path"` | `null` |
@@ -333,15 +333,18 @@ User query
 | `osh.py` | Main application — prompts, LLM interaction, parsing, execution |
 | `ask.py` | Pipe-based general Q&A companion |
 | `install.sh` | Interactive installer with venv and model selection |
+| `tests/` | pytest suite covering config, parsing, safety guards, and interactive flows |
+| `evals/` | Opt-in script comparing QA safety-verdict accuracy across local Ollama models |
 
 ### Thinking Model Handling
 
-Models like gpt-oss place output in a `thinking` field instead of `content`. Osh automatically:
-1. Extracts tagged commands from the thinking field if present
-2. If no tags found, sends the raw thinking text through a reformat pass
-3. Retries reformatting up to 5 times with increased token budget (3× configured max_tokens, minimum 2400)
+Models like gpt-oss place output in a `thinking` field instead of `content`. When `content` comes back empty, osh:
+1. Searches the `thinking` text for `<cN>`/`<eN>` tagged commands and explanations
+2. If tags are found, rebuilds them into a normal tagged response
+3. If no tags are found, falls back to returning the raw thinking text as-is
 4. Filters placeholder/garbage commands (literal "command", "echo 'Could not extract commands'")
-5. Enforces minimum 3 valid options before accepting
+
+This is a single best-effort extraction pass — there's no reformat retry or token-budget scaling. If a thinking model's output doesn't contain recognizable tags, that approach is simply skipped, and `collect_unique_options` moves on (it targets 3 options but doesn't strictly require them).
 
 ### Language Detection
 
@@ -358,14 +361,15 @@ The detected list is injected into the system prompt so the model only suggests 
 Daily log files in `~/.local/state/osh/YYYYMMDD.log`:
 
 ```
-2026-02-21 10:30:45 | INFO | USER_QUERY: find large files
-2026-02-21 10:30:45 | INFO | MODEL: gpt-oss:latest | TEMPERATURE: 0.3 | MAX_TOKENS: 2400
 2026-02-21 10:30:45 | INFO | AVAILABLE_LANGUAGES: bash, awk, sed, perl, python3, node
-2026-02-21 10:30:47 | INFO | LLM_RESPONSE: <c1>find / -size +100M...</c1>...
+2026-02-21 10:30:46 | INFO | SINGLE_OPTION_REQUEST: approach=shell_1
+2026-02-21 10:30:47 | INFO | SINGLE_OPTION_RESPONSE: approach=shell_1 | <c1>find / -size +100M -exec ls -lh {} \; </c1><e1>...</e1>
+2026-02-21 10:30:47 | INFO | OPTION_ACCEPTED: approach=shell_1 | cmd=find / -size +100M -exec ls -lh {} \;
+2026-02-21 10:30:47 | INFO |   ... (repeated per approach until 3 unique options are collected)
 2026-02-21 10:30:48 | INFO | COMMAND_CHECK: find | EXISTS: True
 2026-02-21 10:30:49 | INFO | QA_REVIEW: Sending 3 commands for safety review
 2026-02-21 10:30:50 | INFO | QA_RESPONSE: 1|PASS| | 2|PASS| | 3|WARN|Requires sudo
-2026-02-21 10:30:52 | INFO | USER_SELECTED: Option 1 | COMMAND: find / -size +100M
+2026-02-21 10:30:52 | INFO | USER_SELECTED: Option 1 | COMMAND: find / -size +100M -exec ls -lh {} \;
 2026-02-21 10:30:52 | INFO | ACTION: EXECUTE
 ```
 

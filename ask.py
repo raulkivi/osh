@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 import json
 import os
@@ -133,12 +133,21 @@ def check_and_activate_venv() -> None:
         )
 
 
-check_and_activate_venv()
+# Guarded by __main__ so that importing this module (e.g. from tests, or as
+# a library) can never trigger an os.execv() re-exec as a side effect of import.
+if __name__ == "__main__":
+    check_and_activate_venv()
 
 from ollama import ChatResponse, Client
 
 
 def main() -> None:
+    # The module-level venv check only fires under `if __name__ ==
+    # "__main__"`, so entry points that reach main() via import (e.g. the
+    # pip/deb console-script wrapper) need it re-checked here. A no-op if
+    # already in the configured environment.
+    check_and_activate_venv()
+
     args: list[str] = sys.argv[1:]
 
     if args and args[0] in ('--version', '-V'):

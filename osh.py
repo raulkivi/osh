@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 import json
 import os
@@ -228,8 +228,11 @@ def _get_early_config_path() -> str | None:
     return None
 
 
-# Check venv configuration and switch if needed
-check_and_activate_venv(_get_early_config_path())
+# Check venv configuration and switch if needed. Guarded by __main__ so that
+# importing this module (e.g. from tests, or as a library) can never trigger
+# an os.execv() re-exec as a side effect of import.
+if __name__ == "__main__":
+    check_and_activate_venv(_get_early_config_path())
 
 # Now import modules that require the venv environment
 import argparse
@@ -1080,7 +1083,13 @@ def prompt_user_for_selection(config: dict[str, Any], options: list[tuple[str, s
 def main() -> None:
     # Parse command-line arguments
     args: argparse.Namespace = parse_arguments()
-    
+
+    # The module-level venv check only fires under `if __name__ ==
+    # "__main__"`, so entry points that reach main() via import (e.g. the
+    # pip/deb console-script wrappers) need it re-checked here. A no-op if
+    # already in the configured environment.
+    check_and_activate_venv(args.config)
+
     # Handle --init flag
     if args.init:
         handle_init()
@@ -1128,24 +1137,26 @@ def main() -> None:
     process_query(client, config, shell, user_prompt, ask_flag)
 
 
-def process_query(client: OllamaModel, config: dict[str, Any], shell: str,
-                  user_prompt: str, ask_flag: bool) -> bool:
-    """Process a single natural language query and handle user selection.
+def _generate_and_review(
+    client: OllamaModel,
+    config: dict[str, Any],
+    shell: str,
+    user_prompt: str,
+) -> tuple[list[tuple[str, str]], list[bool], list[tuple[str, str]]]:
+    """Generate command options, check their availability, and run QA review.
 
-    Returns True on normal completion, False when no options could be generated.
+    Returns (options, availability, verdicts). options is empty if generation
+    failed; the caller handles that case (it needs to return False, which
+    this helper — used for retries too — must not do on its own).
     """
     print(colored("Generating command options...", 'cyan'))
     options: list[tuple[str, str]] = collect_unique_options(client, config, shell, user_prompt)
-
     if not options:
-        print(colored("Could not generate command options. Please try again.", 'red'))
-        return False
+        return [], [], []
 
-    # Check if commands exist in the system
     print(colored("Checking command availability...", 'cyan'))
     availability: list[bool] = check_all_commands_availability(options, shell)
 
-    # QA safety review
     verdicts: list[tuple[str, str]] = []
     if config.get("qa_review", True):
         print(colored("Running safety review...", 'cyan'))
@@ -1155,7 +1166,112 @@ def process_query(client: OllamaModel, config: dict[str, Any], shell: str,
             log_warning("QA_REVIEW_FAILED: %s", e)
             print(colored("Warning: QA safety review failed, proceeding without it.", 'yellow'))
 
-    # Display the options with explanations, verdicts, and availability
+    return options, availability, verdicts
+
+
+def _prompt_refined_query(user_prompt: str) -> str:
+    """Ask the user to refine their query; return the original if they decline."""
+    print("Refine your question (press Enter to reuse the original): ", end='')
+    refined: str = input().strip()
+    return refined if refined else user_prompt
+
+
+def _run_safety_gates_and_execute(
+    client: OllamaModel,
+    config: dict[str, Any],
+    shell: str,
+    ask_flag: bool,
+    user_selection: str,
+    idx: int,
+    options: list[tuple[str, str]],
+    availability: list[bool],
+    verdicts: list[tuple[str, str]],
+    user_prompt: str,
+) -> tuple:
+    """Run the availability/FAIL/WARN/ask_flag gates for a selected command
+    and execute it if they all pass.
+
+    Returns ("done", True|False) once the query is fully resolved, or
+    ("retry", options, availability, verdicts, user_prompt) if the command
+    failed and the user chose to retry — the caller loops back with the new
+    options through these SAME gates (a regenerated command is not exempt
+    from the safety checks just because it came from a retry).
+    """
+    selected_command: str = options[idx][0]
+
+    if availability and idx < len(availability) and not availability[idx]:
+        base_cmd = extract_base_command(selected_command)
+        log_info("USER_SELECTED: Option %s | COMMAND: %s | BLOCKED_COMMAND_NOT_FOUND: %s",
+                    user_selection, _sanitize_for_log(selected_command), _sanitize_for_log(base_cmd))
+        print(colored(f"Command '{base_cmd}' not found in system.", 'red'))
+        print("The command may not be installed or available in your PATH.")
+        print("No action taken.")
+        return ("done", True)
+
+    # Block execution of FAIL verdicts
+    if verdicts and idx < len(verdicts) and verdicts[idx][0] == "FAIL":
+        log_info("USER_SELECTED: Option %s | COMMAND: %s | BLOCKED_BY_QA: %s",
+                    user_selection, _sanitize_for_log(selected_command), _sanitize_for_log(verdicts[idx][1]))
+        print(colored(f"Command blocked by safety review: {verdicts[idx][1]}", 'red'))
+        print("No action taken.")
+        return ("done", True)
+
+    if verdicts and idx < len(verdicts) and verdicts[idx][0] == "WARN":
+        print(colored(f"Warning: {verdicts[idx][1]}", 'yellow'))
+        print("Proceed anyway? [Y]es [n]o ==> ", end='')
+        confirm: str = input().strip()
+        if confirm.upper() not in ('', 'Y'):
+            log_info("USER_SELECTED: Option %s | COMMAND: %s | USER_CANCELLED_AFTER_WARN",
+                        user_selection, _sanitize_for_log(selected_command))
+            print("No action taken.")
+            return ("done", True)
+    elif ask_flag:
+        # Ask for confirmation when -a flag is used
+        print("Execute this command? [Y]es [n]o ==> ", end='')
+        confirm = input().strip()
+        if confirm.upper() not in ('', 'Y'):
+            log_info("USER_SELECTED: Option %s | COMMAND: %s | USER_CANCELLED_BY_ASK_FLAG",
+                        user_selection, _sanitize_for_log(selected_command))
+            print("No action taken.")
+            return ("done", True)
+
+    log_info("USER_SELECTED: Option %s | COMMAND: %s", user_selection, _sanitize_for_log(selected_command))
+    log_info("ACTION: EXECUTE")
+    print(f"Executing: {colored(selected_command, config['suggested_command_color'], attrs=['bold'])}")
+    print()
+    proc = subprocess.run([shell, "-c", selected_command], shell=False)
+    if proc.returncode == 0:
+        return ("done", True)
+
+    log_info("COMMAND_FAILED: exit code %d", proc.returncode)
+    print()
+    print(colored(f"Command exited with error (code {proc.returncode}).", 'red'))
+    print("[r]etry with a new query or [q]uit? ==> ", end='')
+    retry_input = input().strip()
+    if retry_input.upper() != 'R':
+        return ("done", True)
+
+    print()
+    user_prompt = _prompt_refined_query(user_prompt)
+    log_info("RETRY_AFTER_ERROR: %s", _sanitize_for_log(user_prompt))
+    new_options, new_availability, new_verdicts = _generate_and_review(client, config, shell, user_prompt)
+    if not new_options:
+        print(colored("Could not generate command options. Please try again.", 'red'))
+        return ("done", False)
+    display_command_options(config, new_options, new_verdicts, new_availability)
+    return ("retry", new_options, new_availability, new_verdicts, user_prompt)
+
+
+def process_query(client: OllamaModel, config: dict[str, Any], shell: str,
+                  user_prompt: str, ask_flag: bool) -> bool:
+    """Process a single natural language query and handle user selection.
+
+    Returns True on normal completion, False when no options could be generated.
+    """
+    options, availability, verdicts = _generate_and_review(client, config, shell, user_prompt)
+    if not options:
+        print(colored("Could not generate command options. Please try again.", 'red'))
+        return False
     display_command_options(config, options, verdicts, availability)
 
     # Check if all commands missed the question — offer to retry
@@ -1165,152 +1281,60 @@ def process_query(client: OllamaModel, config: dict[str, Any], shell: str,
         retry_input: str = input().strip()
         if retry_input.upper() == 'R':
             print()
-            print("Refine your question (press Enter to reuse the original): ", end='')
-            refined: str = input().strip()
-            if refined:
-                user_prompt = refined
+            user_prompt = _prompt_refined_query(user_prompt)
             log_info("RETRY_QUERY: %s", _sanitize_for_log(user_prompt))
-            print(colored("Generating command options...", 'cyan'))
-            options = collect_unique_options(client, config, shell, user_prompt)
+            options, availability, verdicts = _generate_and_review(client, config, shell, user_prompt)
             if not options:
                 print(colored("Could not generate command options. Please try again.", 'red'))
                 return False
-            print(colored("Checking command availability...", 'cyan'))
-            availability = check_all_commands_availability(options, shell)
-            verdicts = []
-            if config.get("qa_review", True):
-                print(colored("Running safety review...", 'cyan'))
-                try:
-                    verdicts = qa_review(client, config, shell, user_prompt, options)
-                except Exception as e:
-                    log_warning("QA_REVIEW_FAILED: %s", e)
-                    print(colored("Warning: QA safety review failed, proceeding without it.", 'yellow'))
             display_command_options(config, options, verdicts, availability)
 
-    # Get user selection
-    valid_choices: list[str] = [str(i) for i in range(1, len(options) + 1)]
-    user_selection: str = prompt_user_for_selection(config, options)
-    print()
+    # Get and handle the user's selection. Looping here (rather than a
+    # one-shot "retry after failed execution" copy of this logic) means a
+    # regenerated set of options always passes back through the same
+    # availability/FAIL/WARN gates before it can be executed.
+    while True:
+        valid_choices: list[str] = [str(i) for i in range(1, len(options) + 1)]
+        user_selection: str = prompt_user_for_selection(config, options)
+        print()
 
-    # Handle user selection
-    if user_selection in valid_choices:
-        idx: int = int(user_selection) - 1
-        if idx < len(options):
-            selected_command: str = options[idx][0]
+        if user_selection in valid_choices:
+            idx: int = int(user_selection) - 1
+            outcome = _run_safety_gates_and_execute(
+                client, config, shell, ask_flag, user_selection, idx,
+                options, availability, verdicts, user_prompt,
+            )
+            if outcome[0] == "done":
+                return outcome[1]
+            _, options, availability, verdicts, user_prompt = outcome
+            continue
 
-            # Check if command is available in the system
-            if availability and idx < len(availability) and not availability[idx]:
-                base_cmd = extract_base_command(selected_command)
-                log_info("USER_SELECTED: Option %s | COMMAND: %s | BLOCKED_COMMAND_NOT_FOUND: %s",
-                            user_selection, _sanitize_for_log(selected_command), _sanitize_for_log(base_cmd))
-                print(colored(f"Command '{base_cmd}' not found in system.", 'red'))
-                print("The command may not be installed or available in your PATH.")
-                print("No action taken.")
-                return
-
-            # Block execution of FAIL verdicts
-            if verdicts and idx < len(verdicts) and verdicts[idx][0] == "FAIL":
-                log_info("USER_SELECTED: Option %s | COMMAND: %s | BLOCKED_BY_QA: %s",
-                            user_selection, _sanitize_for_log(selected_command), _sanitize_for_log(verdicts[idx][1]))
-                print(colored(f"Command blocked by safety review: {verdicts[idx][1]}", 'red'))
-                print("No action taken.")
-            else:
-                if verdicts and idx < len(verdicts) and verdicts[idx][0] == "WARN":
-                    print(colored(f"Warning: {verdicts[idx][1]}", 'yellow'))
-                    print("Proceed anyway? [Y]es [n]o ==> ", end='')
-                    confirm: str = input().strip()
-                    if confirm.upper() not in ['', 'Y']:
-                        log_info("USER_SELECTED: Option %s | COMMAND: %s | USER_CANCELLED_AFTER_WARN",
-                                    user_selection, _sanitize_for_log(selected_command))
-                        print("No action taken.")
-                        return
-                elif ask_flag:
-                    # Ask for confirmation when -a flag is used
-                    print("Execute this command? [Y]es [n]o ==> ", end='')
-                    confirm: str = input().strip()
-                    if confirm.upper() not in ['', 'Y']:
-                        log_info("USER_SELECTED: Option %s | COMMAND: %s | USER_CANCELLED_BY_ASK_FLAG",
-                                    user_selection, _sanitize_for_log(selected_command))
-                        print("No action taken.")
-                        return
-
-                log_info("USER_SELECTED: Option %s | COMMAND: %s", user_selection, _sanitize_for_log(selected_command))
-                log_info("ACTION: EXECUTE")
-                print(f"Executing: {colored(selected_command, config['suggested_command_color'], attrs=['bold'])}")
-                print()
-                proc = subprocess.run([shell, "-c", selected_command], shell=False)
-                if proc.returncode != 0:
-                    log_info("COMMAND_FAILED: exit code %d", proc.returncode)
-                    print()
-                    print(colored(f"Command exited with error (code {proc.returncode}).", 'red'))
-                    print("[r]etry with a new query or [q]uit? ==> ", end='')
-                    retry_input = input().strip()
-                    if retry_input.upper() == 'R':
-                        print()
-                        print("Refine your question (press Enter to reuse the original): ", end='')
-                        refined = input().strip()
-                        if refined:
-                            user_prompt = refined
-                        log_info("RETRY_AFTER_ERROR: %s", _sanitize_for_log(user_prompt))
-                        print(colored("Generating command options...", 'cyan'))
-                        options = collect_unique_options(client, config, shell, user_prompt)
-                        if not options:
-                            print(colored("Could not generate command options. Please try again.", 'red'))
-                            return False
-                        print(colored("Checking command availability...", 'cyan'))
-                        availability = check_all_commands_availability(options, shell)
-                        verdicts = []
-                        if config.get("qa_review", True):
-                            print(colored("Running safety review...", 'cyan'))
-                            try:
-                                verdicts = qa_review(client, config, shell, user_prompt, options)
-                            except Exception as e:
-                                log_warning("QA_REVIEW_FAILED: %s", e)
-                                print(colored("Warning: QA safety review failed, proceeding without it.", 'yellow'))
-                        display_command_options(config, options, verdicts, availability)
-                        # Let user select from new results
-                        user_selection = prompt_user_for_selection(config, options)
-                        print()
-                        valid_choices = [str(i) for i in range(1, len(options) + 1)]
-                        if user_selection in valid_choices:
-                            idx = int(user_selection) - 1
-                            if idx < len(options):
-                                selected_command = options[idx][0]
-                                log_info("USER_SELECTED: Option %s | COMMAND: %s", user_selection, _sanitize_for_log(selected_command))
-                                log_info("ACTION: EXECUTE_AFTER_RETRY")
-                                print(f"Executing: {colored(selected_command, config['suggested_command_color'], attrs=['bold'])}")
-                                print()
-                                subprocess.run([shell, "-c", selected_command], shell=False)
-                            else:
-                                print(colored(f"Option {user_selection} not available.", 'red'))
-                        else:
-                            print("No action taken.")
-        else:
-            log_info("USER_SELECTED: Option %s | NOT_AVAILABLE", user_selection)
-            print(colored(f"Option {user_selection} not available.", 'red'))
-    elif user_selection.upper() == 'C':
-        if missing_posix_display():
-            print(colored("Clipboard not available without DISPLAY.", 'red'))
-            return
-        option_range = "/".join(str(i) for i in range(1, len(options) + 1))
-        print(f"Which command to copy? [{option_range}] ==> ", end='')
-        copy_choice: str = input().strip()
-        if copy_choice in valid_choices:
-            idx = int(copy_choice) - 1
-            if idx < len(options):
+        elif user_selection.upper() == 'C':
+            if missing_posix_display():
+                print(colored("Clipboard not available without DISPLAY.", 'red'))
+                return True
+            option_range = "/".join(str(i) for i in range(1, len(options) + 1))
+            print(f"Which command to copy? [{option_range}] ==> ", end='')
+            copy_choice: str = input().strip()
+            if copy_choice in valid_choices:
+                idx = int(copy_choice) - 1
                 log_info("USER_SELECTED: Option %s | COMMAND: %s", copy_choice, _sanitize_for_log(options[idx][0]))
                 log_info("ACTION: COPY_TO_CLIPBOARD")
                 pyperclip.copy(options[idx][0])
                 print("Copied command to clipboard.")
             else:
                 print(colored(f"Option {copy_choice} not available.", 'red'))
-    elif user_selection.upper() == 'N' or user_selection == '':
-        log_info("USER_SELECTED: None | ACTION: CANCELLED")
-        print("No action taken.")
-    else:
-        log_info("USER_SELECTED: Invalid (%s) | ACTION: NO_ACTION", user_selection)
-        print("No action taken.")
-    return True
+            return True
+
+        elif user_selection.upper() == 'N' or user_selection == '':
+            log_info("USER_SELECTED: None | ACTION: CANCELLED")
+            print("No action taken.")
+            return True
+
+        else:
+            log_info("USER_SELECTED: Invalid (%s) | ACTION: NO_ACTION", user_selection)
+            print("No action taken.")
+            return True
 
 
 _SHELL_MODE_EXIT_PHRASES: frozenset[str] = frozenset({

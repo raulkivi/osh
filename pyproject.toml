@@ -1,10 +1,10 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "osh"
-version = "1.0"
+version = "1.1"
 description = "AI-powered command assistant — translates natural language into Linux/shell commands"
 readme = "README.md"
 license = { text = "MIT" }
@@ -28,9 +28,9 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-    "ollama",
-    "termcolor",
-    "pyperclip",
+    "ollama>=0.6.2",
+    "termcolor>=3.3.0",
+    "pyperclip>=1.11.0",
 ]
 
 [project.optional-dependencies]
