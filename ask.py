@@ -19,7 +19,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "api": "ollama",
     "model": "gpt-oss:latest",
     "temperature": 0.3,
-    "max_tokens": 400,
+    "max_tokens": 2400,
     "python_venv": None,
     "ollama_endpoint": "http://localhost:11434",
 }
