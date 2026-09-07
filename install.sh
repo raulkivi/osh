@@ -145,51 +145,118 @@ else
   "$PYTHON_CMD" -m pip install -q -r requirements.txt
 fi
 
-# Ollama Model Selection
+# Backend Selection
 echo ""
-echo "Ollama Model Selection"
-echo "======================"
+echo "Model Backend Selection"
+echo "========================"
 echo ""
+echo "  1) Ollama (default)"
+echo "  2) llama.cpp (llama-server)"
+echo ""
+read -rp "Select backend [1]: " backend_choice
 
+SELECTED_API="ollama"
 SELECTED_MODEL=""
-if command -v ollama >/dev/null 2>&1; then
-  echo "Available Ollama models:"
+LLAMA_CPP_ENDPOINT=""
+
+if [ "$backend_choice" = "2" ]; then
+  SELECTED_API="llama_cpp"
+
   echo ""
+  read -rp "llama.cpp server endpoint URL [http://localhost:38080]: " llama_cpp_endpoint_input
+  LLAMA_CPP_ENDPOINT="${llama_cpp_endpoint_input:-http://localhost:38080}"
 
-  mapfile -t MODELS < <(ollama list | tail -n +2 | awk '{print $1}' | grep -v '^$')
-
-  if [ ${#MODELS[@]} -eq 0 ]; then
-    echo "No models found. Please install a model first using:"
-    echo "  ollama pull llama3"
-    echo ""
-    read -rp "Skip model selection? [Y/n]: " skip_model
-    if [[ "$skip_model" =~ ^[Nn]$ ]]; then
-      exit 1
+  MODELS=()
+  if command -v curl >/dev/null 2>&1; then
+    MODELS_JSON=$(curl -s --max-time 5 "$LLAMA_CPP_ENDPOINT/v1/models" 2>/dev/null || true)
+    if [ -n "$MODELS_JSON" ]; then
+      mapfile -t MODELS < <(printf '%s' "$MODELS_JSON" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for m in data.get('data', []):
+        model_id = m.get('id')
+        if model_id:
+            print(model_id)
+except Exception:
+    pass
+" 2>/dev/null)
     fi
-  else
-    # Display models with numbers
+  fi
+
+  if [ ${#MODELS[@]} -gt 0 ]; then
+    echo ""
+    echo "Models available from llama-server at $LLAMA_CPP_ENDPOINT:"
+    echo ""
     for i in "${!MODELS[@]}"; do
       printf "  %d) %s\n" $((i+1)) "${MODELS[$i]}"
     done
     echo ""
-    echo "Recommended: llama3:latest (fast, reliable)"
-    echo "Note: Avoid reasoning models like deepseek-r1 for shell commands"
-    echo ""
-    read -rp "Select model number [or press Enter to skip]: " model_choice
+    read -rp "Select model number [or press Enter to type a name]: " model_choice
 
     if [ -n "$model_choice" ] && \
        [[ "$model_choice" =~ ^[0-9]+$ ]] && \
        [ "$model_choice" -ge 1 ] && \
        [ "$model_choice" -le "${#MODELS[@]}" ]; then
       SELECTED_MODEL="${MODELS[$((model_choice-1))]}"
-      echo "Selected model: $SELECTED_MODEL"
-    else
-      echo "No model selected, will use default configuration"
     fi
+  else
+    echo ""
+    echo "Could not reach $LLAMA_CPP_ENDPOINT to list loaded models."
+    echo "(Make sure 'llama-server' is running, or enter the model name manually.)"
   fi
+
+  if [ -z "$SELECTED_MODEL" ]; then
+    read -rp "Model name (as loaded by llama-server): " SELECTED_MODEL
+  fi
+  echo "Selected model: ${SELECTED_MODEL:-<none>}"
+
 else
-  echo "Warning: ollama not found. Install it from https://ollama.com"
-  echo "Skipping model selection..."
+  # Ollama Model Selection
+  echo ""
+  echo "Ollama Model Selection"
+  echo "======================"
+  echo ""
+
+  if command -v ollama >/dev/null 2>&1; then
+    echo "Available Ollama models:"
+    echo ""
+
+    mapfile -t MODELS < <(ollama list | tail -n +2 | awk '{print $1}' | grep -v '^$')
+
+    if [ ${#MODELS[@]} -eq 0 ]; then
+      echo "No models found. Please install a model first using:"
+      echo "  ollama pull llama3"
+      echo ""
+      read -rp "Skip model selection? [Y/n]: " skip_model
+      if [[ "$skip_model" =~ ^[Nn]$ ]]; then
+        exit 1
+      fi
+    else
+      # Display models with numbers
+      for i in "${!MODELS[@]}"; do
+        printf "  %d) %s\n" $((i+1)) "${MODELS[$i]}"
+      done
+      echo ""
+      echo "Recommended: llama3:latest (fast, reliable)"
+      echo "Note: Avoid reasoning models like deepseek-r1 for shell commands"
+      echo ""
+      read -rp "Select model number [or press Enter to skip]: " model_choice
+
+      if [ -n "$model_choice" ] && \
+         [[ "$model_choice" =~ ^[0-9]+$ ]] && \
+         [ "$model_choice" -ge 1 ] && \
+         [ "$model_choice" -le "${#MODELS[@]}" ]; then
+        SELECTED_MODEL="${MODELS[$((model_choice-1))]}"
+        echo "Selected model: $SELECTED_MODEL"
+      else
+        echo "No model selected, will use default configuration"
+      fi
+    fi
+  else
+    echo "Warning: ollama not found. Install it from https://ollama.com"
+    echo "Skipping model selection..."
+  fi
 fi
 
 # Save configuration
@@ -199,14 +266,18 @@ if [[ ! "$save_config" =~ ^[Nn]$ ]]; then
   mkdir -p "$CONFIG_DIR"
 
   # Pass shell values via environment variables — no shell interpolation inside Python source
-  selected_model="$SELECTED_MODEL" venv_config="$VENV_CONFIG" config_dir="$CONFIG_DIR" \
+  selected_api="$SELECTED_API" selected_model="$SELECTED_MODEL" \
+  llama_cpp_endpoint="$LLAMA_CPP_ENDPOINT" \
+  venv_config="$VENV_CONFIG" config_dir="$CONFIG_DIR" \
   python3 - <<'PYEOF'
 import json, os
 from pathlib import Path
 
 config_path = Path(os.environ["config_dir"]) / "config.json"
 venv_config  = os.environ.get("venv_config", "")
+selected_api = os.environ.get("selected_api", "ollama")
 selected_model = os.environ.get("selected_model", "")
+llama_cpp_endpoint = os.environ.get("llama_cpp_endpoint", "")
 
 try:
     config = json.loads(config_path.read_text())
@@ -221,10 +292,14 @@ except Exception:
         "suggested_command_color": "blue",
         "ollama_endpoint": "http://localhost:11434",
         "ollama_cloud_endpoint": "https://ollama.com",
+        "llama_cpp_endpoint": "http://localhost:38080",
         "logging_enabled": True,
         "log_retention_days": 30,
     }
 
+config["api"] = selected_api
+if llama_cpp_endpoint:
+    config["llama_cpp_endpoint"] = llama_cpp_endpoint
 if venv_config:
     config["python_venv"] = venv_config
 if selected_model:
@@ -235,8 +310,11 @@ elif "model" not in config:
 config_path.write_text(json.dumps(config, indent=2) + "\n")
 
 print(f"Configuration saved to: {config_path}")
+print(f"Backend: {selected_api}")
 if selected_model:
     print(f"Model: {selected_model}")
+if selected_api == "llama_cpp":
+    print(f"llama.cpp endpoint: {config['llama_cpp_endpoint']}")
 if venv_config:
     print(f"Python environment: {venv_config}")
 PYEOF

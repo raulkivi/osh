@@ -24,6 +24,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "python_venv": None,
     "ollama_endpoint": "http://localhost:11434",
     "ollama_cloud_endpoint": "https://ollama.com",
+    "llama_cpp_endpoint": "http://localhost:38080",
     "logging_enabled": True,
     "log_retention_days": 30,
 }
@@ -239,6 +240,8 @@ import argparse
 import logging
 import shlex
 import shutil
+import urllib.error
+import urllib.request
 from ollama import Client
 import subprocess
 import pyperclip
@@ -307,7 +310,11 @@ def strip_cloud_suffix(name: str) -> str:
     return name
 
 
-def get_model_client(config: dict[str, Any]) -> "OllamaModel":
+def get_model_client(config: dict[str, Any]) -> "OllamaModel | LlamaCppModel":
+    if config.get("api") == "llama_cpp":
+        llama_cpp_api: str = config.get("llama_cpp_endpoint", "http://localhost:38080")
+        log_info("LLAMA_CPP_MODEL: endpoint=%s model=%s", llama_cpp_api, config.get("model", ""))
+        return LlamaCppModel(host=llama_cpp_api)
     model: str = config.get("model", "")
     if is_cloud_model(model):
         api_key: str | None = os.environ.get("OLLAMA_API_KEY")
@@ -329,18 +336,33 @@ def get_model_client(config: dict[str, Any]) -> "OllamaModel":
 
 
 def select_model_interactively(config: dict[str, Any]) -> str:
-    """List available Ollama models and prompt user to select one."""
-    try:
-        c = Client(host=config.get("ollama_endpoint", "http://localhost:11434"))
-        result = c.list()
-        model_names: list[str] = [m.model for m in result.models]
-    except Exception as e:
-        print(f"Error fetching models from Ollama: {e}", file=sys.stderr)
-        sys.exit(1)
+    """List available models and prompt user to select one."""
+    if config.get("api") == "llama_cpp":
+        llama_cpp_api: str = config.get("llama_cpp_endpoint", "http://localhost:38080")
+        try:
+            request = urllib.request.Request(f"{llama_cpp_api.rstrip('/')}/v1/models")
+            with urllib.request.urlopen(request, timeout=10) as resp:
+                body: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
+            model_names: list[str] = [m["id"] for m in body.get("data", [])]
+        except Exception as e:
+            print(f"Error fetching models from llama.cpp server: {e}", file=sys.stderr)
+            sys.exit(1)
 
-    if not model_names:
-        print("No models available from Ollama.", file=sys.stderr)
-        sys.exit(1)
+        if not model_names:
+            print("No models available from llama.cpp server.", file=sys.stderr)
+            sys.exit(1)
+    else:
+        try:
+            c = Client(host=config.get("ollama_endpoint", "http://localhost:11434"))
+            result = c.list()
+            model_names = [m.model for m in result.models]
+        except Exception as e:
+            print(f"Error fetching models from Ollama: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        if not model_names:
+            print("No models available from Ollama.", file=sys.stderr)
+            sys.exit(1)
 
     print("\nAvailable models:")
     for i, name in enumerate(model_names, 1):
@@ -425,9 +447,55 @@ class OllamaModel:
                 return '\n'.join(parts_out)
             # If we couldn't extract, return the thinking as-is
             return thinking
-        
+
         return content
 
+
+class LlamaCppModel:
+    """Chat client for a local llama.cpp `llama-server`.
+
+    llama-server doesn't implement Ollama's native `/api/chat` wire format,
+    so this talks the OpenAI-compatible `/v1/chat/completions` endpoint that
+    llama-server exposes instead, via stdlib urllib (no extra dependency).
+    """
+
+    def __init__(self, host: str, headers: dict[str, str] | None = None) -> None:
+        self.host: str = host.rstrip("/")
+        self.headers: dict[str, str] = headers or {}
+
+    def chat(self, model: str, messages: list[dict[str, str]], temperature: float | None = None, max_tokens: int | None = None) -> str:
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+        }
+        if temperature is not None:
+            payload["temperature"] = temperature
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+
+        request = urllib.request.Request(
+            f"{self.host}/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", **self.headers},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=120) as resp:
+                body: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detail: str = e.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"llama.cpp server error (HTTP {e.code}): {detail}") from e
+        except urllib.error.URLError as e:
+            raise RuntimeError(
+                f"Cannot reach llama.cpp server at {self.host}. "
+                f"Is `llama-server` running? ({e.reason})"
+            ) from e
+
+        try:
+            return body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as e:
+            raise RuntimeError(f"Unexpected response from llama.cpp server: {body}") from e
 
 
 QA_PROMPT = """\
@@ -613,30 +681,44 @@ def handle_init() -> None:
     print("\nOh Shell! Configuration Setup")
     print("==============================\n")
     print("Press Enter to accept the default value shown in [brackets].\n")
-    
-    # Prompt for configuration values
-    model: str = input(f"Ollama model name [{DEFAULT_CONFIG['model']}]: ").strip() or DEFAULT_CONFIG['model']
-    
-    endpoint: str = input(f"Ollama endpoint URL [{DEFAULT_CONFIG['ollama_endpoint']}]: ").strip() or DEFAULT_CONFIG['ollama_endpoint']
 
-    cloud_endpoint: str = input(f"Ollama cloud endpoint URL [{DEFAULT_CONFIG['ollama_cloud_endpoint']}]: ").strip() or DEFAULT_CONFIG['ollama_cloud_endpoint']
+    print("Backend:")
+    print("  1. Ollama (default)")
+    print("  2. llama.cpp (llama-server)")
+    backend_choice: str = input("Select backend [1]: ").strip()
+    api: str = "llama_cpp" if backend_choice == "2" else DEFAULT_CONFIG["api"]
 
-    print("\nCloud model support:")
-    print("  To use cloud models, append ':cloud' or '-cloud' to the model name (e.g. llama3.2:cloud).")
-    print("  Cloud models require an Ollama account and API key:")
-    print("    1. Create a free account at https://ollama.com")
-    print("    2. Generate an API key in your account settings")
-    print("    3. Set the environment variable (e.g. in ~/.bashrc or ~/.zshrc):")
-    print("         export OLLAMA_API_KEY=<your-key>")
+    endpoint: str = DEFAULT_CONFIG['ollama_endpoint']
+    cloud_endpoint: str = DEFAULT_CONFIG['ollama_cloud_endpoint']
+    llama_cpp_endpoint: str = DEFAULT_CONFIG['llama_cpp_endpoint']
+
+    if api == "llama_cpp":
+        model: str = input(f"Model name (as loaded by llama-server) [{DEFAULT_CONFIG['model']}]: ").strip() or DEFAULT_CONFIG['model']
+        llama_cpp_endpoint = input(f"llama.cpp server endpoint URL [{llama_cpp_endpoint}]: ").strip() or llama_cpp_endpoint
+    else:
+        # Prompt for configuration values
+        model = input(f"Ollama model name [{DEFAULT_CONFIG['model']}]: ").strip() or DEFAULT_CONFIG['model']
+
+        endpoint = input(f"Ollama endpoint URL [{endpoint}]: ").strip() or endpoint
+
+        cloud_endpoint = input(f"Ollama cloud endpoint URL [{cloud_endpoint}]: ").strip() or cloud_endpoint
+
+        print("\nCloud model support:")
+        print("  To use cloud models, append ':cloud' or '-cloud' to the model name (e.g. llama3.2:cloud).")
+        print("  Cloud models require an Ollama account and API key:")
+        print("    1. Create a free account at https://ollama.com")
+        print("    2. Generate an API key in your account settings")
+        print("    3. Set the environment variable (e.g. in ~/.bashrc or ~/.zshrc):")
+        print("         export OLLAMA_API_KEY=<your-key>")
 
     print(f"\nPython virtual environment [{DEFAULT_CONFIG['python_venv'] or 'none'}]")
     print("  Formats: 'pyenv:name', 'venv:/path', or leave empty for none")
     venv_input: str = input("  Value: ").strip()
     python_venv: str | None = venv_input if venv_input else DEFAULT_CONFIG['python_venv']
-    
+
     # Create config dictionary
     new_config: dict[str, Any] = {
-        "api": DEFAULT_CONFIG["api"],
+        "api": api,
         "model": model,
         "temperature": DEFAULT_CONFIG["temperature"],
         "max_tokens": DEFAULT_CONFIG["max_tokens"],
@@ -647,6 +729,7 @@ def handle_init() -> None:
         "python_venv": python_venv,
         "ollama_endpoint": endpoint,
         "ollama_cloud_endpoint": cloud_endpoint,
+        "llama_cpp_endpoint": llama_cpp_endpoint,
         "logging_enabled": DEFAULT_CONFIG["logging_enabled"],
         "log_retention_days": DEFAULT_CONFIG["log_retention_days"],
     }
@@ -743,6 +826,7 @@ def print_usage(config: dict[str, Any]) -> None:
     print("* Python Venv      : " + str(config["python_venv"]))
     print("* Ollama Endpoint  : " + str(config["ollama_endpoint"]))
     print("* Cloud Endpoint   : " + str(config["ollama_cloud_endpoint"]))
+    print("* Llama.cpp URL    : " + str(config.get("llama_cpp_endpoint", DEFAULT_CONFIG["llama_cpp_endpoint"])))
     print("* Logging Enabled  : " + str(config["logging_enabled"]))
     print("* Log Retention    : " + str(config["log_retention_days"]) + " days")
 
@@ -1110,12 +1194,13 @@ def main() -> None:
     _logger = setup_logging(config)
     
     _display_model = config.get("model", "")
-    _display_host = (
-        config.get("ollama_cloud_endpoint", "https://ollama.com")
-        if is_cloud_model(_display_model)
-        else config.get("ollama_endpoint", "http://localhost:11434")
-    )
-    client: OllamaModel = get_model_client(config)
+    if config.get("api") == "llama_cpp":
+        _display_host = config.get("llama_cpp_endpoint", "http://localhost:38080")
+    elif is_cloud_model(_display_model):
+        _display_host = config.get("ollama_cloud_endpoint", "https://ollama.com")
+    else:
+        _display_host = config.get("ollama_endpoint", "http://localhost:11434")
+    client: OllamaModel | LlamaCppModel = get_model_client(config)
     print(colored(f"Host: {_display_host}  Model: {config['model']}", 'cyan'))
 
     shell: str = get_safe_shell()

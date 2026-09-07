@@ -7,6 +7,8 @@ import json
 import os
 import re
 import sys
+import urllib.error
+import urllib.request
 from typing import Any
 
 # Matches ANSI/VT escape sequences (CSI and single-char ESC) to prevent terminal injection
@@ -22,6 +24,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "max_tokens": 2400,
     "python_venv": None,
     "ollama_endpoint": "http://localhost:11434",
+    "llama_cpp_endpoint": "http://localhost:38080",
 }
 
 
@@ -141,6 +144,46 @@ if __name__ == "__main__":
 from ollama import ChatResponse, Client
 
 
+def _llama_cpp_chat(host: str, model: str, messages: list[dict[str, str]], temperature: float | None = None, max_tokens: int | None = None) -> str:
+    """Send a chat request to a local llama.cpp `llama-server` via its OpenAI-compatible API.
+
+    llama-server doesn't implement Ollama's native `/api/chat` wire format, so
+    this talks `/v1/chat/completions` instead, via stdlib urllib (no extra
+    dependency).
+    """
+    payload: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+    }
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
+
+    request = urllib.request.Request(
+        f"{host.rstrip('/')}/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as resp:
+            body: dict[str, Any] = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail: str = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"llama.cpp server error (HTTP {e.code}): {detail}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(
+            f"Cannot reach llama.cpp server at {host}. Is `llama-server` running? ({e.reason})"
+        ) from e
+
+    try:
+        return body["choices"][0]["message"]["content"]
+    except (KeyError, IndexError) as e:
+        raise RuntimeError(f"Unexpected response from llama.cpp server: {body}") from e
+
+
 def main() -> None:
     # The module-level venv check only fires under `if __name__ ==
     # "__main__"`, so entry points that reach main() via import (e.g. the
@@ -185,29 +228,39 @@ def main() -> None:
         sys.exit(1)
 
     config: dict[str, Any] = load_config()
-    client = Client(host=config.get("ollama_endpoint", "http://localhost:11434"))
-
-    options: dict[str, Any] = {}
-    if config.get('temperature') is not None:
-        options['temperature'] = config['temperature']
-    if config.get('max_tokens') is not None:
-        options['num_predict'] = config['max_tokens']
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_input},
+    ]
 
     try:
-        response: ChatResponse = client.chat(  # type: ignore[misc]
-            model=config["model"],
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_input},
-            ],
-            options=options,
-            stream=False,
-        )
+        if config.get("api") == "llama_cpp":
+            content: str = _llama_cpp_chat(
+                host=config.get("llama_cpp_endpoint", "http://localhost:38080"),
+                model=config["model"],
+                messages=messages,
+                temperature=config.get("temperature"),
+                max_tokens=config.get("max_tokens"),
+            )
+        else:
+            client = Client(host=config.get("ollama_endpoint", "http://localhost:11434"))
+
+            options: dict[str, Any] = {}
+            if config.get('temperature') is not None:
+                options['temperature'] = config['temperature']
+            if config.get('max_tokens') is not None:
+                options['num_predict'] = config['max_tokens']
+
+            response: ChatResponse = client.chat(  # type: ignore[misc]
+                model=config["model"],
+                messages=messages,
+                options=options,
+                stream=False,
+            )
+            content = getattr(response.message, 'content', None) or ""
     except Exception as e:
         print(f"Error communicating with model: {e}", file=sys.stderr)
         sys.exit(1)
-
-    content: str = getattr(response.message, 'content', None) or ""
     if not content.strip():
         print("Error: empty response from model.", file=sys.stderr)
         sys.exit(1)

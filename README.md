@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.1-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
-Learn and use Linux through natural language — powered by local LLMs via Ollama.
+Learn and use Linux through natural language — powered by local LLMs via Ollama or a local llama.cpp `llama-server`.
 
 Describe what you want in plain English and get 3 executable command options, each with detailed explanations that break down every pipe, flag, and chained command so you understand what you're running.
 
@@ -29,7 +29,7 @@ Describe what you want in plain English and get 3 executable command options, ea
 ## Requirements
 
 - Python 3.11+
-- [Ollama](https://ollama.ai) installed and running locally
+- [Ollama](https://ollama.ai) installed and running locally, or a local [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server`
 
 ## Quick Start
 
@@ -54,7 +54,7 @@ The installer will:
 2. Create symlinks in `~/.local/bin/` (`osh`, `ask`, `computer`)
 3. Prompt for Python environment (pyenv, venv, or system)
 4. Install pip dependencies
-5. Let you select an Ollama model
+5. Let you choose a backend — Ollama (lists installed models) or llama.cpp `llama-server` (lists models from a running server, or lets you type the model name)
 6. Save configuration to `~/.config/osh/config.json`
 
 After installation, ensure `~/.local/bin` is in your PATH:
@@ -216,6 +216,7 @@ osh --init
   "python_venv": null,
   "ollama_endpoint": "http://localhost:11434",
   "ollama_cloud_endpoint": "https://ollama.com",
+  "llama_cpp_endpoint": "http://localhost:38080",
   "logging_enabled": true,
   "log_retention_days": 30
 }
@@ -223,7 +224,8 @@ osh --init
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `model` | Ollama model name | `gpt-oss:latest` |
+| `api` | Backend to use: `"ollama"` or `"llama_cpp"` | `ollama` |
+| `model` | Model name (Ollama model name, or the model llama-server has loaded) | `gpt-oss:latest` |
 | `temperature` | Randomness (0.0–2.0) | `0.3` |
 | `max_tokens` | Max response tokens (increase for thinking models) | `2400` |
 | `safety` | Stored/shown by `--init` and the usage screen; not currently wired to any prompt-before-execute logic (that's controlled by `-a`/`--ask` and WARN verdicts) | `true` |
@@ -232,8 +234,23 @@ osh --init
 | `python_venv` | `null`, `"pyenv:name"`, or `"venv:/path"` | `null` |
 | `ollama_endpoint` | Local Ollama API URL | `http://localhost:11434` |
 | `ollama_cloud_endpoint` | Ollama cloud API URL | `https://ollama.com` |
+| `llama_cpp_endpoint` | Local llama.cpp `llama-server` URL (used when `api` is `"llama_cpp"`) | `http://localhost:38080` |
 | `logging_enabled` | Enable daily log files | `true` |
 | `log_retention_days` | Auto-delete logs older than N days | `30` |
+
+### llama.cpp (`llama-server`)
+
+Both `osh` and `ask` can talk to a local [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` instead of Ollama, via its OpenAI-compatible `/v1/chat/completions` endpoint. Start the server (e.g. `llama-server -m model.gguf --port 38080`), then set:
+
+```json
+{
+  "api": "llama_cpp",
+  "model": "model-name-as-loaded-by-llama-server",
+  "llama_cpp_endpoint": "http://localhost:38080"
+}
+```
+
+Both tools read the same `~/.config/osh/config.json`, so this switches the backend for both at once. `./install.sh` and `osh --init` offer this as a backend choice, and `osh -m -` lists models exposed by the running `llama-server`. Cloud models (`:cloud`/`-cloud` suffix) are an Ollama-only feature and don't apply to this backend.
 
 ### Custom Config Path
 
