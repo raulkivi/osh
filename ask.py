@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import json
 import os
@@ -179,9 +179,12 @@ def _llama_cpp_chat(host: str, model: str, messages: list[dict[str, str]], tempe
         ) from e
 
     try:
-        return body["choices"][0]["message"]["content"]
+        content: Any = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as e:
         raise RuntimeError(f"Unexpected response from llama.cpp server: {body}") from e
+    if not isinstance(content, str):
+        raise RuntimeError(f"Unexpected response from llama.cpp server: {body}")
+    return content
 
 
 def main() -> None:

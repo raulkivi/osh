@@ -1,6 +1,6 @@
 # Oh Shell! (osh)
 
-![Version](https://img.shields.io/badge/version-1.1-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-1.2-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Learn and use Linux through natural language — powered by local LLMs via Ollama or a local llama.cpp `llama-server`.
 

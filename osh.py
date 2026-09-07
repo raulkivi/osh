@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import json
 import os
@@ -238,6 +238,7 @@ if __name__ == "__main__":
 # Now import modules that require the venv environment
 import argparse
 import logging
+import re
 import shlex
 import shutil
 import urllib.error
@@ -267,6 +268,12 @@ def log_warning(message: str, *args: Any) -> None:
 def _sanitize_for_log(value: str) -> str:
     """Strip newlines from user/LLM-supplied strings to prevent log injection."""
     return value.replace('\n', ' ').replace('\r', ' ')
+
+
+# Matches ANSI/VT escape sequences (CSI and single-char ESC) to prevent terminal injection
+_ANSI_ESCAPE: re.Pattern[str] = re.compile(
+    r'(?:\x1B[@-Z\\-_]|\x1B\[[0-?]*[ -/]*[@-~])'
+)
 
 
 # Scripting languages to probe for availability
@@ -313,7 +320,11 @@ def strip_cloud_suffix(name: str) -> str:
 def get_model_client(config: dict[str, Any]) -> "OllamaModel | LlamaCppModel":
     if config.get("api") == "llama_cpp":
         llama_cpp_api: str = config.get("llama_cpp_endpoint", "http://localhost:38080")
-        log_info("LLAMA_CPP_MODEL: endpoint=%s model=%s", llama_cpp_api, config.get("model", ""))
+        log_info(
+            "LLAMA_CPP_MODEL: endpoint=%s model=%s",
+            _sanitize_for_log(llama_cpp_api),
+            _sanitize_for_log(config.get("model", "")),
+        )
         return LlamaCppModel(host=llama_cpp_api)
     model: str = config.get("model", "")
     if is_cloud_model(model):
@@ -366,7 +377,7 @@ def select_model_interactively(config: dict[str, Any]) -> str:
 
     print("\nAvailable models:")
     for i, name in enumerate(model_names, 1):
-        print(f"  {i}. {name}")
+        print(f"  {i}. {_ANSI_ESCAPE.sub('', name)}")
 
     print(f"\nSelect model [1-{len(model_names)}] ==> ", end='')
     choice: str = input().strip()
@@ -493,9 +504,12 @@ class LlamaCppModel:
             ) from e
 
         try:
-            return body["choices"][0]["message"]["content"]
+            content: Any = body["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as e:
             raise RuntimeError(f"Unexpected response from llama.cpp server: {body}") from e
+        if not isinstance(content, str):
+            raise RuntimeError(f"Unexpected response from llama.cpp server: {body}")
+        return content
 
 
 QA_PROMPT = """\
