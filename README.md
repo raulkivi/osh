@@ -1,6 +1,6 @@
 # NLSH
 
-![Version](https://img.shields.io/badge/version-1.3-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+[![CI](https://github.com/raulkivi/nlsh/actions/workflows/ci.yml/badge.svg)](https://github.com/raulkivi/nlsh/actions/workflows/ci.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/raulkivi/nlsh/badge)](https://scorecard.dev/viewer/?uri=github.com/raulkivi/nlsh) ![Version](https://img.shields.io/badge/version-1.3-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Learn and use Linux through natural language — powered by local LLMs via Ollama or a local llama.cpp `llama-server`.
 
