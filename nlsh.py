@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 import json
 import os
@@ -36,7 +36,7 @@ def get_config_path() -> str:
         'XDG_CONFIG_HOME',
         os.path.expanduser('~/.config')
     )
-    return os.path.join(config_home, 'osh', 'config.json')
+    return os.path.join(config_home, 'nlsh', 'config.json')
 
 
 def get_state_dir() -> str:
@@ -45,14 +45,14 @@ def get_state_dir() -> str:
         'XDG_STATE_HOME',
         os.path.expanduser('~/.local/state')
     )
-    return os.path.join(state_home, 'osh')
+    return os.path.join(state_home, 'nlsh')
 
 
 def get_daily_log_file() -> str:
     """Get the log file path for today with YYYYMMDD.log format.
     
     Returns:
-        Full path to today's log file (e.g., ~/.local/state/osh/20260220.log)
+        Full path to today's log file (e.g., ~/.local/state/nlsh/20260220.log)
     """
     from datetime import datetime
     
@@ -163,7 +163,7 @@ def check_and_activate_venv(config_path: str | None = None) -> None:
     - null/missing    -> Uses current Python (no switching)
 
     Note: Uses os.execv to replace the process, so the parent shell
-    remains unaffected after osh exits.
+    remains unaffected after nlsh exits.
     """
     python_venv: str | None = get_python_venv_early(config_path)
 
@@ -562,7 +562,7 @@ PROPOSED COMMANDS:
 
 
 SINGLE_OPTION_PROMPT = """\
-You are Oh Shell! (osh), a natural language to {shell} command translation engine for {os}. \
+You are NLSH, a natural language to {shell} command translation engine for {os}. \
 You are an expert in {shell} on {os} and translate the question at the end to valid command \
 line syntax.
 
@@ -627,7 +627,7 @@ def setup_logging(config: dict[str, Any]) -> logging.Logger | None:
     # Check if logging is enabled
     if not config.get('logging_enabled', True):
         # Return a dummy logger that does nothing
-        logger = logging.getLogger('osh')
+        logger = logging.getLogger('nlsh')
         logger.addHandler(logging.NullHandler())
         logger.setLevel(logging.CRITICAL + 1)  # Effectively disable
         return logger
@@ -652,15 +652,15 @@ def setup_logging(config: dict[str, Any]) -> logging.Logger | None:
         datefmt='%Y-%m-%d %H:%M:%S',
         force=True  # Force reconfiguration in case already configured
     )
-    return logging.getLogger('osh')
+    return logging.getLogger('nlsh')
 
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        prog='osh',
-        description='Oh Shell! - Natural language to shell command translator',
-        epilog='Example: osh list files in current directory'
+        prog='nlsh',
+        description='NLSH - Natural language to shell command translator',
+        epilog='Example: nlsh list files in current directory'
     )
     
     parser.add_argument('query', nargs='*',
@@ -692,8 +692,8 @@ def handle_init() -> None:
             print("Configuration not changed.")
             sys.exit(0)
     
-    print("\nOh Shell! Configuration Setup")
-    print("==============================\n")
+    print("\nNLSH Configuration Setup")
+    print("========================\n")
     print("Press Enter to accept the default value shown in [brackets].\n")
 
     print("Backend:")
@@ -757,7 +757,7 @@ def handle_init() -> None:
         with os.fdopen(fd, 'w') as f:
             json.dump(new_config, f, indent=2)
         print(f"\nConfiguration saved to: {config_path}")
-        print("\nYou can edit this file directly or run 'osh --init' again to reconfigure.")
+        print("\nYou can edit this file directly or run 'nlsh --init' again to reconfigure.")
     except Exception as e:
         print(f"Error writing configuration: {e}", file=sys.stderr)
         sys.exit(1)
@@ -823,9 +823,9 @@ def parse_qa_verdicts(response: str) -> list[tuple[str, str]]:
 
 
 def print_usage(config: dict[str, Any]) -> None:
-    print("Oh Shell! (osh) v0.2")
+    print("NLSH v0.2")
     print()
-    print("Usage: osh [-a] list the current directory information")
+    print("Usage: nlsh [-a] list the current directory information")
     print("Argument: -a: Prompt the user before running the command (only useful when safety is off)")
     print()
     print("Current configuration:")
@@ -1445,7 +1445,7 @@ _SHELL_MODE_COMMANDS: dict[str, str] = {
     '!exit':    'Exit shell mode',
     '!quit':    'Exit shell mode',
     '!help':    'Show this help message',
-    '!version': 'Show osh version',
+    '!version': 'Show nlsh version',
     '!history': 'Show recent queries from today\'s session log',
 }
 
@@ -1534,13 +1534,13 @@ def _shell_mode_history(n: int = 20) -> None:
 
 
 def run_shell_mode(client: OllamaModel, config: dict[str, Any], shell: str, ask_flag: bool) -> None:
-    """Run osh in interactive shell (REPL) mode.
+    """Run nlsh in interactive shell (REPL) mode.
 
     Enters a read-eval-print loop that accepts natural language queries.
     Type '!help' for available commands or '!' / '!exit' / '!quit' to leave.
     Natural language exit phrases (e.g. 'exit', 'quit', 'bye') also work.
     """
-    print(colored("Oh Shell! - Interactive Shell Mode", 'cyan'))
+    print(colored("NLSH - Interactive Shell Mode", 'cyan'))
     print(colored("Type your request in plain English, or '!help' for commands, '!' to exit.", 'cyan'))
     print()
 
@@ -1568,7 +1568,7 @@ def run_shell_mode(client: OllamaModel, config: dict[str, Any], shell: str, ask_
             if cmd == '!help':
                 _shell_mode_help()
             elif cmd == '!version':
-                print(f"osh version {__version__}")
+                print(f"nlsh version {__version__}")
             elif cmd == '!history':
                 _shell_mode_history()
             else:

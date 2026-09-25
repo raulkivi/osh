@@ -4,7 +4,7 @@ import urllib.error
 
 import pytest
 
-import osh
+import nlsh
 
 
 class FakeHTTPResponse:
@@ -32,9 +32,9 @@ class TestLlamaCppModelChat:
             captured["headers"] = request.headers
             return FakeHTTPResponse({"choices": [{"message": {"content": "ls -la"}}]})
 
-        monkeypatch.setattr(osh.urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(nlsh.urllib.request, "urlopen", fake_urlopen)
 
-        client = osh.LlamaCppModel(host="http://localhost:38080")
+        client = nlsh.LlamaCppModel(host="http://localhost:38080")
         result = client.chat(
             model="qwen2.5-coder",
             messages=[{"role": "user", "content": "list files"}],
@@ -59,9 +59,9 @@ class TestLlamaCppModelChat:
             captured["url"] = request.full_url
             return FakeHTTPResponse({"choices": [{"message": {"content": "ok"}}]})
 
-        monkeypatch.setattr(osh.urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(nlsh.urllib.request, "urlopen", fake_urlopen)
 
-        client = osh.LlamaCppModel(host="http://localhost:38080/")
+        client = nlsh.LlamaCppModel(host="http://localhost:38080/")
         client.chat(model="m", messages=[])
 
         assert captured["url"] == "http://localhost:38080/v1/chat/completions"
@@ -73,9 +73,9 @@ class TestLlamaCppModelChat:
             captured["body"] = json.loads(request.data.decode("utf-8"))
             return FakeHTTPResponse({"choices": [{"message": {"content": "ok"}}]})
 
-        monkeypatch.setattr(osh.urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(nlsh.urllib.request, "urlopen", fake_urlopen)
 
-        osh.LlamaCppModel(host="http://localhost:38080").chat(model="m", messages=[])
+        nlsh.LlamaCppModel(host="http://localhost:38080").chat(model="m", messages=[])
 
         assert "temperature" not in captured["body"]
         assert "max_tokens" not in captured["body"]
@@ -84,9 +84,9 @@ class TestLlamaCppModelChat:
         def fake_urlopen(request, timeout=None):
             raise urllib.error.URLError("Connection refused")
 
-        monkeypatch.setattr(osh.urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(nlsh.urllib.request, "urlopen", fake_urlopen)
 
-        client = osh.LlamaCppModel(host="http://localhost:38080")
+        client = nlsh.LlamaCppModel(host="http://localhost:38080")
         with pytest.raises(RuntimeError, match="Cannot reach llama.cpp server"):
             client.chat(model="m", messages=[])
 
@@ -96,9 +96,9 @@ class TestLlamaCppModelChat:
                 request.full_url, 500, "Internal Server Error", None, __import__("io").BytesIO(b"boom")
             )
 
-        monkeypatch.setattr(osh.urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(nlsh.urllib.request, "urlopen", fake_urlopen)
 
-        client = osh.LlamaCppModel(host="http://localhost:38080")
+        client = nlsh.LlamaCppModel(host="http://localhost:38080")
         with pytest.raises(RuntimeError, match="HTTP 500"):
             client.chat(model="m", messages=[])
 
@@ -106,36 +106,36 @@ class TestLlamaCppModelChat:
         def fake_urlopen(request, timeout=None):
             return FakeHTTPResponse({"unexpected": "shape"})
 
-        monkeypatch.setattr(osh.urllib.request, "urlopen", fake_urlopen)
+        monkeypatch.setattr(nlsh.urllib.request, "urlopen", fake_urlopen)
 
-        client = osh.LlamaCppModel(host="http://localhost:38080")
+        client = nlsh.LlamaCppModel(host="http://localhost:38080")
         with pytest.raises(RuntimeError, match="Unexpected response"):
             client.chat(model="m", messages=[])
 
 
 class TestGetModelClient:
     def test_defaults_to_ollama(self):
-        config = osh.DEFAULT_CONFIG.copy()
-        client = osh.get_model_client(config)
-        assert isinstance(client, osh.OllamaModel)
+        config = nlsh.DEFAULT_CONFIG.copy()
+        client = nlsh.get_model_client(config)
+        assert isinstance(client, nlsh.OllamaModel)
 
     def test_dispatches_to_llama_cpp_when_configured(self):
-        config = osh.DEFAULT_CONFIG.copy()
+        config = nlsh.DEFAULT_CONFIG.copy()
         config["api"] = "llama_cpp"
         config["llama_cpp_endpoint"] = "http://localhost:38080"
 
-        client = osh.get_model_client(config)
+        client = nlsh.get_model_client(config)
 
-        assert isinstance(client, osh.LlamaCppModel)
+        assert isinstance(client, nlsh.LlamaCppModel)
         assert client.host == "http://localhost:38080"
 
     def test_llama_cpp_ignores_cloud_suffix_on_model(self):
         # api=llama_cpp is a purely local backend; a ":cloud" model suffix
         # (an Ollama-only convention) must not route to Ollama's cloud path.
-        config = osh.DEFAULT_CONFIG.copy()
+        config = nlsh.DEFAULT_CONFIG.copy()
         config["api"] = "llama_cpp"
         config["model"] = "some-model:cloud"
 
-        client = osh.get_model_client(config)
+        client = nlsh.get_model_client(config)
 
-        assert isinstance(client, osh.LlamaCppModel)
+        assert isinstance(client, nlsh.LlamaCppModel)

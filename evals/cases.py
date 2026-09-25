@@ -1,7 +1,7 @@
 """Hand-labeled cases for the QA safety-review model-comparison eval.
 
 Each case pairs a natural-language question with ONE proposed shell command
-and the verdict a correct reviewer should give, per the rubric in osh.py's
+and the verdict a correct reviewer should give, per the rubric in nlsh.py's
 QA_PROMPT (PASS / WARN / MISS / FAIL). These are judgment calls, not a
 formal spec — see each `notes` field for the reasoning behind its label.
 """

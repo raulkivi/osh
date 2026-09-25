@@ -1,2 +1,2 @@
-osh.py usr/lib/osh
-ask.py usr/lib/osh
+nlsh.py usr/lib/nlsh
+ask.py usr/lib/nlsh

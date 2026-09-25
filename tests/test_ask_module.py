@@ -2,25 +2,25 @@ import json
 import os
 
 import ask
-import osh
+import nlsh
 
 
 def test_default_config_shared_keys_match_osh():
-    # ask.DEFAULT_CONFIG is intentionally a smaller subset of osh.DEFAULT_CONFIG
+    # ask.DEFAULT_CONFIG is intentionally a smaller subset of nlsh.DEFAULT_CONFIG
     # (ask has no QA review / logging / shell config), but both tools read the
     # same config.json, so keys present in both must default to the same value.
     for key, value in ask.DEFAULT_CONFIG.items():
-        assert osh.DEFAULT_CONFIG[key] == value, f"{key!r} default drifted between ask.py and osh.py"
+        assert nlsh.DEFAULT_CONFIG[key] == value, f"{key!r} default drifted between ask.py and nlsh.py"
 
 
 def test_get_config_path_matches_osh(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    assert ask.get_config_path() == osh.get_config_path()
+    assert ask.get_config_path() == nlsh.get_config_path()
 
 
 def test_load_config_merges_user_values(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    config_dir = tmp_path / "osh"
+    config_dir = tmp_path / "nlsh"
     config_dir.mkdir()
     (config_dir / "config.json").write_text(json.dumps({"model": "custom-model"}))
 
@@ -37,7 +37,7 @@ def test_load_config_defaults_when_file_missing(monkeypatch, tmp_path):
 
 def test_pyenv_path_traversal_is_blocked(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    config_dir = tmp_path / "osh"
+    config_dir = tmp_path / "nlsh"
     config_dir.mkdir()
     (config_dir / "config.json").write_text(
         json.dumps({"python_venv": "pyenv:../../etc/passwd"})

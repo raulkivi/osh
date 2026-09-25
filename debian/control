@@ -1,10 +1,10 @@
-Source: osh
+Source: nlsh
 Maintainer: Raul Kivi <raul.kivi@proton.me>
 Section: utils
 Priority: optional
-Homepage: https://github.com/raulkivi/osh
-Vcs-Git: https://github.com/raulkivi/osh.git
-Vcs-Browser: https://github.com/raulkivi/osh
+Homepage: https://github.com/raulkivi/nlsh
+Vcs-Git: https://github.com/raulkivi/nlsh.git
+Vcs-Browser: https://github.com/raulkivi/nlsh
 Standards-Version: 4.6.1
 Rules-Requires-Root: no
 Build-Depends: debhelper (>= 13),
@@ -12,7 +12,7 @@ Build-Depends: debhelper (>= 13),
                python3-all,
                python3-setuptools
 
-Package: osh
+Package: nlsh
 Architecture: all
 Depends: ${python3:Depends},
          ${misc:Depends},
@@ -22,7 +22,7 @@ Depends: ${python3:Depends},
          python3-pyperclip
 Recommends: ollama
 Description: AI-powered command assistant using local LLMs
- osh (Oh Shell!) translates natural language descriptions into executable
+ nlsh translates natural language descriptions into executable
  Linux/shell commands using local LLMs via Ollama.
  .
  Describe what you want in plain English and get 3 ranked command

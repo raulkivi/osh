@@ -1,3 +1,10 @@
+nlsh (1.3ppa1) noble; urgency=low
+
+  * Renamed package from osh to nlsh: "osh" clashed with an unrelated
+    PyPI package (Jack Orenstein's Object SHell). No functional changes.
+
+ -- Raul Kivi <raul.kivi@proton.me>  Fri, 25 Sep 2026 00:00:00 +0000
+
 osh (1.2ppa1) noble; urgency=low
 
   * Add llama.cpp llama-server backend support (api="llama_cpp",

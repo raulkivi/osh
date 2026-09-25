@@ -1,13 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-# Installer for Oh Shell! (osh) following XDG Base Directory specification
+# Installer for NLSH following XDG Base Directory specification
 
-APP_DIR="$HOME/.local/osh"
+APP_DIR="$HOME/.local/nlsh"
 BIN_DIR="$HOME/.local/bin"
-CONFIG_DIR="$HOME/.config/osh"
+CONFIG_DIR="$HOME/.config/nlsh"
 
-echo "Hello. Installing Oh Shell! (osh)..."
+echo "Hello. Installing NLSH..."
 
 # Check if ~/.local/bin is in PATH
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
@@ -39,28 +39,39 @@ if [ -d "$HOME/osh" ]; then
   rm -rf "$HOME/osh"
 fi
 
+# Migrate from the old 'osh' package name (renamed to nlsh)
+if [ -d "$HOME/.local/osh" ]; then
+  echo "  Found old osh installation at ~/.local/osh, removing..."
+  rm -rf "$HOME/.local/osh"
+fi
+if [ -d "$HOME/.config/osh" ] && [ ! -e "$CONFIG_DIR" ]; then
+  echo "  Migrating config from ~/.config/osh to $CONFIG_DIR..."
+  cp -r "$HOME/.config/osh" "$CONFIG_DIR"
+fi
+rm -f "$BIN_DIR/osh"
+
 echo "- Creating directories..."
 mkdir -p "$APP_DIR"
 mkdir -p "$BIN_DIR"
 mkdir -p "$CONFIG_DIR"
 
 echo "- Copying application files..."
-cp osh.py "$APP_DIR/"
+cp nlsh.py "$APP_DIR/"
 cp ask.py "$APP_DIR/"
-chmod +x "$APP_DIR/osh.py"
+chmod +x "$APP_DIR/nlsh.py"
 chmod +x "$APP_DIR/ask.py"
 
 echo "- Creating executable links in $BIN_DIR..."
-ln -sf "$APP_DIR/osh.py" "$BIN_DIR/osh"
+ln -sf "$APP_DIR/nlsh.py" "$BIN_DIR/nlsh"
 ln -sf "$APP_DIR/ask.py" "$BIN_DIR/ask"
-# Also create 'computer' alias for osh
-ln -sf "$APP_DIR/osh.py" "$BIN_DIR/computer"
+# Also create 'computer' alias for nlsh
+ln -sf "$APP_DIR/nlsh.py" "$BIN_DIR/computer"
 
 echo ""
 echo "Python Virtual Environment Setup"
 echo "================================="
 echo ""
-echo "Select Python environment for osh:"
+echo "Select Python environment for nlsh:"
 echo "  1) pyenv virtual environment"
 echo "  2) Standard Python venv"
 echo "  3) System Python (no virtual environment)"
@@ -102,7 +113,7 @@ case $venv_choice in
   2)
     # venv option
     echo ""
-    read -rp "Enter path to venv directory (e.g., ~/venvs/osh): " venv_path
+    read -rp "Enter path to venv directory (e.g., ~/venvs/nlsh): " venv_path
     venv_path="${venv_path/#\~/$HOME}"  # Expand ~ to full path
 
     if [ ! -d "$venv_path" ]; then
@@ -261,7 +272,7 @@ fi
 
 # Save configuration
 echo ""
-read -rp "Save configuration to osh config? [Y/n]: " save_config
+read -rp "Save configuration to nlsh config? [Y/n]: " save_config
 if [[ ! "$save_config" =~ ^[Nn]$ ]]; then
   mkdir -p "$CONFIG_DIR"
 
@@ -319,7 +330,7 @@ if venv_config:
     print(f"Python environment: {venv_config}")
 PYEOF
 else
-  echo "Configuration not saved. Run 'osh --init' to configure later."
+  echo "Configuration not saved. Run 'nlsh --init' to configure later."
 fi
 
 echo ""
@@ -328,14 +339,14 @@ echo ""
 echo "Next steps:"
 if [ -f "$CONFIG_DIR/config.json" ]; then
   echo "  1. Review your configuration: $CONFIG_DIR/config.json"
-  echo "     (Run 'osh --init' to reconfigure)"
+  echo "     (Run 'nlsh --init' to reconfigure)"
 else
-  echo "  1. Configure osh by running: osh --init"
+  echo "  1. Configure nlsh by running: nlsh --init"
 fi
 echo "  2. If $BIN_DIR is not in your PATH, add it to your shell config"
 echo "  3. Restart your shell or run: source ~/.bashrc (or ~/.zshrc)"
 echo ""
 echo "Usage:"
-echo "  osh what is my username"
+echo "  nlsh what is my username"
 echo "  echo 'your question' | ask"
 echo ""

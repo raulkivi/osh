@@ -11,10 +11,10 @@
       "WebFetch(domain:dyn.manpages.debian.org)",
       "WebFetch(domain:ubuntu-manpage.readthedocs.io)",
       "WebFetch(domain:help.ubuntu.com)",
-      "Bash(chmod +x /home/luarvik/src/osh/debian/rules)"
+      "Bash(chmod +x /home/luarvik/src/nlsh/debian/rules)"
     ],
     "additionalDirectories": [
-      "/home/luarvik/src/osh/debian"
+      "/home/luarvik/src/nlsh/debian"
     ]
   }
 }

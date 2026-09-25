@@ -95,7 +95,7 @@ class TestLlamaCppChat:
 class TestMainDispatchesToLlamaCpp:
     def test_uses_llama_cpp_backend_when_configured(self, monkeypatch, tmp_path, capsys):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-        config_dir = tmp_path / "osh"
+        config_dir = tmp_path / "nlsh"
         config_dir.mkdir()
         (config_dir / "config.json").write_text(json.dumps({
             "api": "llama_cpp",

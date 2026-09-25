@@ -1,14 +1,14 @@
 # Personal Package Archive
 
-**URL:** https://ppa.launchpadcontent.net/raulkivi/osh
+**URL:** https://ppa.launchpadcontent.net/raulkivi/nlsh
 
 ## Display name
 
-Oh Shell! — AI-powered command assistant
+NLSH — AI-powered command assistant
 
 ## Description
 
-osh (Oh Shell!) is an AI-powered command-line assistant that translates natural language into executable Linux/shell commands using local LLMs via Ollama.
+nlsh is an AI-powered command-line assistant that translates natural language into executable Linux/shell commands using local LLMs via Ollama.
 
 Describe what you want in plain English and get 3 ranked command alternatives with detailed, line-by-line explanations — no cloud required, no man-page diving.
 

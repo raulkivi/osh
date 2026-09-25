@@ -34,7 +34,7 @@ def get_config_path() -> str:
         'XDG_CONFIG_HOME',
         os.path.expanduser('~/.config')
     )
-    return os.path.join(config_home, 'osh', 'config.json')
+    return os.path.join(config_home, 'nlsh', 'config.json')
 
 
 def get_python_venv_early() -> str | None:

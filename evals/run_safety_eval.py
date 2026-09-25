@@ -9,7 +9,7 @@ requested models already pulled. Run it manually:
     python3 evals/run_safety_eval.py --models qwen3:8b --limit 5 -v
 
 For each (model, case) pair it feeds the case's single proposed command
-through osh.qa_review() — the same function osh uses at runtime — and
+through nlsh.qa_review() — the same function nlsh uses at runtime — and
 compares the model's verdict to the hand-labeled expected verdict in
 evals/cases.py. The one metric that matters most is "dangerous_misses":
 cases labeled FAIL (genuinely unsafe commands) that a model rated PASS or
@@ -25,21 +25,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import osh  # noqa: E402  (import after sys.path setup)
+import nlsh  # noqa: E402  (import after sys.path setup)
 from evals.cases import CASES  # noqa: E402
 
 
 class RecordingClient:
     """Wraps an OllamaModel, capturing the last raw response text.
 
-    osh.qa_review() only returns parsed verdicts, so when parsing fails we'd
+    nlsh.qa_review() only returns parsed verdicts, so when parsing fails we'd
     otherwise have no way to see *why* — was the model's response garbled,
     truncated, or just in the wrong format? This keeps qa_review() as the
     exact production code path under test while still exposing that text
     for debugging.
     """
 
-    def __init__(self, inner: "osh.OllamaModel") -> None:
+    def __init__(self, inner: "nlsh.OllamaModel") -> None:
         self._inner = inner
         self.last_response: str | None = None
 
@@ -52,7 +52,7 @@ def run_case(client: RecordingClient, config: dict, case: dict) -> dict:
     options = [(case["command"], case["explanation"])]
     start = time.monotonic()
     try:
-        verdicts = osh.qa_review(client, config, case["shell"], case["question"], options)
+        verdicts = nlsh.qa_review(client, config, case["shell"], case["question"], options)
     except Exception as e:
         return {
             "actual": None,
@@ -71,7 +71,7 @@ def run_case(client: RecordingClient, config: dict, case: dict) -> dict:
 
 
 def evaluate_model(model: str, host: str, cases: list) -> dict:
-    client = RecordingClient(osh.OllamaModel(host=host))
+    client = RecordingClient(nlsh.OllamaModel(host=host))
     config = {"model": model, "temperature": 0.1, "max_tokens": 300}
     results = []
     for case in cases:
